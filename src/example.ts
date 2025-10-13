@@ -1,29 +1,36 @@
 // Example: Starting Agent OS
 
-import { createAgentOS, type AgentOSConfig } from './index';
+import { 
+  createAgentOS, 
+  modelManager, 
+  taskManager, 
+  ledger,
+  type ModelManagerConfig 
+} from './index';
 
-const config: AgentOSConfig = {
-  port: 3000,
-  models: {
-    providers: {
-      'openai-main': {
-        endpoint: 'https://api.openai.com/v1',
-        apiKey: process.env.OPENAI_API_KEY || '',
-        adapterType: 'openai',
-        models: [
-          { type: 'llm', name: 'gpt-4-turbo-preview' },
-          { type: 'llm', name: 'gpt-3.5-turbo' },
-          { type: 'embed', name: 'text-embedding-3-small' },
-          { type: 'embed', name: 'text-embedding-3-large' },
-        ],
-      },
+const modelConfig: ModelManagerConfig = {
+  providers: {
+    'openai-main': {
+      endpoint: 'https://api.openai.com/v1',
+      apiKey: process.env.OPENAI_API_KEY || '',
+      adapterType: 'openai',
+      models: [
+        { type: 'llm', name: 'gpt-4-turbo-preview' },
+        { type: 'llm', name: 'gpt-3.5-turbo' },
+        { type: 'embed', name: 'text-embedding-3-small' },
+        { type: 'embed', name: 'text-embedding-3-large' },
+      ],
     },
   },
 };
 
 const main = async () => {
-  const agentOS = await createAgentOS(config);
-  await agentOS.start();
+  const agentOS = createAgentOS()
+    .with(modelManager(modelConfig))
+    .with(taskManager())
+    .with(ledger());
+
+  await agentOS.start(3000);
 
   // Graceful shutdown
   process.on('SIGINT', async () => {

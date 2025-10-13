@@ -3,7 +3,7 @@
 import { registerModelAbilities } from './abilities';
 import { createOpenAIAdapter } from './providers/openai';
 
-import type { AgentBus } from '../types';
+import type { AgentModule } from '../types';
 import type { ProviderRegistry, ProviderAdapter, ProviderConfig, AdapterType } from './types';
 
 export type ModelManagerConfig = {
@@ -18,11 +18,6 @@ export type ModelManagerConfig = {
   >;
 };
 
-export type ModelManager = {
-  registry: ProviderRegistry;
-  adapters: Map<string, ProviderAdapter>;
-};
-
 const createAdapterRegistry = (): Map<string, ProviderAdapter> => {
   const registry = new Map<string, ProviderAdapter>();
 
@@ -32,34 +27,27 @@ const createAdapterRegistry = (): Map<string, ProviderAdapter> => {
   return registry;
 };
 
-export const createModelManager = (
-  config: ModelManagerConfig,
-  bus: AgentBus
-): ModelManager => {
+export const modelManager = (config: ModelManagerConfig): AgentModule => {
   const registry: ProviderRegistry = new Map();
 
   // Build provider registry from config
   for (const [providerName, providerConfig] of Object.entries(config.providers)) {
-    const config: ProviderConfig = {
+    const providerConfigObj: ProviderConfig = {
       endpoint: providerConfig.endpoint,
       apiKey: providerConfig.apiKey,
       adapterType: providerConfig.adapterType,
       models: providerConfig.models,
     };
-    registry.set(providerName, config);
+    registry.set(providerName, providerConfigObj);
   }
 
   const adapters = createAdapterRegistry();
 
-  const manager: ModelManager = {
-    registry,
-    adapters,
+  return {
+    registerAbilities: (bus): void => {
+      registerModelAbilities(registry, adapters, bus);
+    },
   };
-
-  // Register model abilities
-  registerModelAbilities(manager.registry, manager.adapters, bus);
-
-  return manager;
 };
 
 export type { ChatMessage, ToolCall, ToolDefinition } from './types';

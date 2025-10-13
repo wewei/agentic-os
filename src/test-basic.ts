@@ -1,8 +1,11 @@
 // Basic functionality test for Agent OS
 
-import { createAgentOS } from './index';
+import { createAgentBus } from './bus';
 
-import type { InvokeResult } from './types';
+import { modelManager, taskManager, ledger } from './index';
+
+import type { ModelManagerConfig } from './model';
+import type { AgentBus, InvokeResult } from './types';
 
 const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
   if (result.type === 'success') {
@@ -12,36 +15,42 @@ const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
   throw new Error(`Invoke failed (${result.type}): ${errorMsg}`);
 };
 
-const createTestAgentOS = async () => {
-  console.log('1. Creating Agent OS...');
-  const agentOS = await createAgentOS({
-    port: 3001,
-    models: {
-      providers: {
-        'openai-test': {
-          endpoint: 'https://api.openai.com/v1',
-          apiKey: process.env.OPENAI_API_KEY || '',
-          adapterType: 'openai',
-          models: [
-            { type: 'llm', name: 'gpt-4-turbo-preview' },
-            { type: 'embed', name: 'text-embedding-3-small' },
-          ],
-        },
+const createTestBus = (): AgentBus => {
+  console.log('1. Creating test bus with modules...');
+  
+  const bus = createAgentBus();
+  
+  const modelConfig: ModelManagerConfig = {
+    providers: {
+      'openai-test': {
+        endpoint: 'https://api.openai.com/v1',
+        apiKey: process.env.OPENAI_API_KEY || '',
+        adapterType: 'openai',
+        models: [
+          { type: 'llm', name: 'gpt-4-turbo-preview' },
+          { type: 'embed', name: 'text-embedding-3-small' },
+        ],
       },
     },
-  });
-  console.log('✓ Agent OS created\n');
-  return agentOS;
+  };
+
+  // Register modules
+  modelManager(modelConfig).registerAbilities(bus);
+  taskManager().registerAbilities(bus);
+  ledger().registerAbilities(bus);
+
+  console.log('✓ Test bus created\n');
+  return bus;
 };
 
-const testBusAbilities = async (bus: { invoke: (abilityId: string, callId: string, callerId: string, input: string) => Promise<InvokeResult<string, string>> }) => {
+const testBusAbilities = async (bus: AgentBus) => {
   console.log('2. Testing Bus abilities...');
   const modules = unwrapInvokeResult(await bus.invoke('bus:list', 'test-call-1', 'test', '{}'));
   const modulesData = JSON.parse(modules) as { modules: Array<{ name: string }> };
   console.log('✓ Modules:', modulesData.modules.map((m) => m.name).join(', '));
 };
 
-const testModelManager = async (bus: { invoke: (abilityId: string, callId: string, callerId: string, input: string) => Promise<InvokeResult<string, string>> }) => {
+const testModelManager = async (bus: AgentBus) => {
   console.log('\n3. Testing Model Manager...');
   const models = unwrapInvokeResult(await bus.invoke('model:listLLM', 'test-call-2', 'test', '{}'));
   const modelsData = JSON.parse(models) as {
@@ -53,7 +62,7 @@ const testModelManager = async (bus: { invoke: (abilityId: string, callId: strin
   );
 };
 
-const testTaskManager = async (bus: { invoke: (abilityId: string, callId: string, callerId: string, input: string) => Promise<InvokeResult<string, string>> }) => {
+const testTaskManager = async (bus: AgentBus) => {
   console.log('\n4. Testing Task Manager...');
   const spawnResult = unwrapInvokeResult(await bus.invoke(
     'task:spawn',
@@ -74,10 +83,10 @@ const testTaskManager = async (bus: { invoke: (abilityId: string, callId: string
 const testBasicFunctionality = async () => {
   console.log('🧪 Testing Agent OS Basic Functionality\n');
   
-  const agentOS = await createTestAgentOS();
-  await testBusAbilities(agentOS.bus);
-  await testModelManager(agentOS.bus);
-  await testTaskManager(agentOS.bus);
+  const bus = createTestBus();
+  await testBusAbilities(bus);
+  await testModelManager(bus);
+  await testTaskManager(bus);
 
   console.log('\n✅ Basic functionality tests passed!\n');
   console.log('Note: Server not started in test mode');

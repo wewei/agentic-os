@@ -1,118 +1,74 @@
 // Agent OS - Main Entry Point
 
-import { createAgentBus, type AgentBus } from './bus';
-import { createMockLedger, registerLedgerAbilities, type Ledger } from './ledger';
-import {
-  createModelManager,
-  type ModelManager,
-  type ModelManagerConfig,
-} from './model';
-import { createShell, type Shell } from './shell';
-import { createTaskManager, type TaskManager } from './task';
+import { createAgentBus } from './bus';
+import { shell } from './shell';
 
-export type AgentOSConfig = {
-  port?: number;
-  models: ModelManagerConfig;
-};
+import type { AgentModule } from './types';
 
 export type AgentOS = {
-  bus: AgentBus;
-  ledger: Ledger;
-  modelManager: ModelManager;
-  taskManager: TaskManager;
-  shell: Shell;
-  start: () => Promise<void>;
+  with: (module: AgentModule) => AgentOS;
+  start: (port?: number) => Promise<void>;
   stop: () => Promise<void>;
 };
 
-const verifyDependencies = (bus: AgentBus): void => {
-  const required = [
-    // Ledger abilities
-    'ldg:task:save',
-    'ldg:task:get',
-    'ldg:msg:save',
-    'ldg:msg:list',
-    // Model abilities
-    'model:llm',
-    'model:listLLM',
-    'model:listEmbed',
-    // Task abilities
-    'task:spawn',
-    'task:send',
-    // Shell abilities
-    'shell:send',
-    // Bus abilities
-    'bus:list',
-  ];
-
-  for (const abilityId of required) {
-    if (!bus.has(abilityId)) {
-      throw new Error(`Required ability not registered: ${abilityId}`);
-    }
-  }
-
-  console.log('✓ All required abilities verified');
-};
-
-export const createAgentOS = async (config: AgentOSConfig): Promise<AgentOS> => {
+export const createAgentOS = (): AgentOS => {
   console.log('Creating Agent OS...');
 
-  // 1. Create Agent Bus
-  console.log('- Creating Agent Bus...');
+  // Create Agent Bus with bus controller
   const bus = createAgentBus();
 
-  // 2. Create and register Ledger (Mock)
-  console.log('- Creating Mock Ledger...');
-  const ledger = createMockLedger();
-  registerLedgerAbilities(ledger, bus);
+  // Create shell module
+  const shellModule = shell();
 
-  // 3. Create Model Manager
-  console.log('- Creating Model Manager...');
-  const modelManager = createModelManager(config.models, bus);
+  // Register shell immediately (always present)
+  shellModule.registerAbilities(bus);
 
-  // 4. Create Shell
-  console.log('- Creating Shell...');
-  const shell = createShell(bus);
+  // Store additional modules to register
+  const modules: AgentModule[] = [];
 
-  // 5. Create Task Manager
-  console.log('- Creating Task Manager...');
-  const taskManager = createTaskManager(bus);
+  console.log('✓ Agent OS created with minimal bus and shell');
 
-  // 6. Verify all dependencies
-  console.log('- Verifying dependencies...');
-  verifyDependencies(bus);
+  const agentOS: AgentOS = {
+    with: (module: AgentModule): AgentOS => {
+      modules.push(module);
+      return agentOS;
+    },
 
-  console.log('✓ Agent OS created successfully');
+    start: async (port = 3000): Promise<void> => {
+      console.log('\nRegistering modules...');
 
-  const start = async (): Promise<void> => {
-    const port = config.port || 3000;
-    console.log(`\nStarting Agent OS on port ${port}...`);
-    await shell.start(port);
-    console.log('✓ Agent OS started');
+      // Register all modules
+      for (const module of modules) {
+        module.registerAbilities(bus);
+      }
+
+      console.log('✓ All modules registered');
+
+      // Start shell server
+      console.log(`\nStarting Agent OS on port ${port}...`);
+      await shellModule.getShell().start(port);
+      console.log('✓ Agent OS started');
+    },
+
+    stop: async (): Promise<void> => {
+      console.log('\nStopping Agent OS...');
+      await shellModule.getShell().stop();
+      console.log('✓ Agent OS stopped');
+    },
   };
 
-  const stop = async (): Promise<void> => {
-    console.log('\nStopping Agent OS...');
-    await shell.stop();
-    console.log('✓ Agent OS stopped');
-  };
-
-  return {
-    bus,
-    ledger,
-    modelManager,
-    taskManager,
-    shell,
-    start,
-    stop,
-  };
+  return agentOS;
 };
 
 // Export types
-export type { AgentBus } from './bus';
-export type { Ledger } from './ledger';
-export type { ModelManager, ModelManagerConfig } from './model';
-export type { TaskManager } from './task';
+export type { AgentBus, AgentModule } from './types';
+export type { Ledger, LedgerConfig } from './ledger';
+export type { ModelManagerConfig } from './model';
 export type { Shell } from './shell';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';
+
+// Export module factories
+export { ledger } from './ledger';
+export { modelManager } from './model';
+export { taskManager } from './task';
 

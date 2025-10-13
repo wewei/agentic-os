@@ -74,7 +74,12 @@ const createNewTask = async (callId: string, bus: AgentBus, message: string): Pr
   return parsed.taskId;
 };
 
-export const createRoutes = (bus: AgentBus) => {
+export type Routes = {
+  handleSend: (req: Request) => Promise<Response>;
+  handleStream: (req: Request, params: { taskId: string }) => Response;
+};
+
+export const createRoutes = (bus: AgentBus): Routes => {
   // POST /send - Receive user message
   const handleSend = async (req: Request): Promise<Response> => {
     try {

@@ -2,24 +2,20 @@
 import { registerTaskAbilities } from './abilities';
 import { createExecuteTask } from './runloop';
 
-import type { AgentBus } from '../types';
+import type { AgentModule } from '../types';
 import type { TaskRegistry } from './types';
 
-export type TaskManager = {
-  registry: TaskRegistry;
-};
-
-export const createTaskManager = (bus: AgentBus): TaskManager => {
+export const taskManager = (): AgentModule => {
   const registry: TaskRegistry = new Map();
 
-  // Create execute task function
-  const executeTask = createExecuteTask(registry, bus);
-
-  // Register task abilities
-  registerTaskAbilities(registry, bus, executeTask);
-
   return {
-    registry,
+    registerAbilities: (bus): void => {
+      // Create execute task function
+      const executeTask = createExecuteTask(registry, bus);
+
+      // Register task abilities
+      registerTaskAbilities(registry, bus, executeTask);
+    },
   };
 };
 
