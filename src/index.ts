@@ -23,27 +23,16 @@ export const createAgentOS = (): AgentOS => {
   // Register shell immediately (always present)
   shellModule.registerAbilities(bus);
 
-  // Store additional modules to register
-  const modules: AgentModule[] = [];
-
   console.log('✓ Agent OS created with minimal bus and shell');
 
   const agentOS: AgentOS = {
     with: (module: AgentModule): AgentOS => {
-      modules.push(module);
+      // Register module immediately when added
+      module.registerAbilities(bus);
       return agentOS;
     },
 
     start: async (port = 3000): Promise<void> => {
-      console.log('\nRegistering modules...');
-
-      // Register all modules
-      for (const module of modules) {
-        module.registerAbilities(bus);
-      }
-
-      console.log('✓ All modules registered');
-
       // Start shell server
       console.log(`\nStarting Agent OS on port ${port}...`);
       await shellModule.start(port);
