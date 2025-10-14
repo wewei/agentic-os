@@ -1,0 +1,33 @@
+# Agentic OS Configuration Example
+# Copy this file to ~/.agentic-os/config.yaml and customize as needed
+
+cli:
+  # UI theme (currently only 'default' is supported)
+  theme: default
+  # Maximum number of messages to keep in history
+  messageLimit: 1000
+
+model:
+  # LLM provider (e.g., 'openai', 'anthropic')
+  provider: openai
+  # Model name
+  model: gpt-4
+  # API key (or use environment variable)
+  # apiKey: your-api-key-here
+
+shell:
+  # Maximum buffer size for shell output (in bytes)
+  maxBufferSize: 1048576
+
+task:
+  # Maximum number of concurrent tasks
+  maxConcurrentTasks: 5
+
+memory:
+  # Memory persistence settings
+  persistPath: ~/.agentic-os/memory
+
+ledger:
+  # Token usage tracking
+  trackUsage: true
+

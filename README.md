@@ -9,7 +9,8 @@ Agentic OS 是一个基于总线架构的 Agent 系统实现。
 ```
 agent-os/
 ├── packages/
-│   └── core/          # @agentic-os/core - 核心系统
+│   ├── core/          # @agentic-os/core - 核心系统
+│   └── cli/           # @agentic-os/cli - 终端 UI
 └── package.json       # 工作空间根配置
 ```
 
@@ -30,15 +31,16 @@ export OPENAI_API_KEY=your-api-key-here
 
 ### 3. 启动 Agentic OS
 
+启动核心系统：
+
 ```bash
 bun run dev
 ```
 
-或者进入 core package：
+或启动 CLI 终端 UI：
 
 ```bash
-cd packages/core
-bun run dev
+bun run cli
 ```
 
 ## Packages
@@ -53,6 +55,16 @@ bun run dev
 - Ledger - 数据持久化（当前为 Mock 实现）
 
 详细文档请查看 [packages/core/README.md](./packages/core/README.md)
+
+### [@agentic-os/cli](./packages/cli)
+
+终端用户界面 (TUI)，基于 blessed 构建：
+- 上下分屏布局：消息流 + 输入框
+- 模块化配置：从 `~/.agentic-os/config.yaml` 读取
+- 函数式设计：纯函数和不可变状态
+- 命令系统：支持 `/help`、`/clear`、`/config` 等命令
+
+详细文档请查看 [packages/cli/README.md](./packages/cli/README.md)
 
 ## 开发
 
