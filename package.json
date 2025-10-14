@@ -1,32 +1,24 @@
 {
-  "name": "@agentic-os/core",
+  "name": "@agentic-os/monorepo",
   "version": "0.1.0",
-  "description": "Agentic OS - A bus-based agent system implementation",
-  "module": "src/index.ts",
+  "private": true,
+  "description": "Agentic OS - A bus-based agent system monorepo",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "bun --watch src/example.ts",
-    "start": "bun run src/example.ts",
+    "dev": "bun run --cwd packages/core dev",
+    "start": "bun run --cwd packages/core start",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
-  },
-  "dependencies": {
-    "openai": "^6.0.1",
-    "uuid": "^11.0.3",
-    "zod": "^4.1.12"
+    "lint": "bun run --cwd packages/core lint",
+    "lint:fix": "bun run --cwd packages/core lint:fix",
+    "clean": "rm -rf node_modules packages/*/node_modules",
+    "install:all": "bun install"
   },
   "devDependencies": {
-    "@eslint/js": "^9.15.0",
     "@types/bun": "latest",
-    "@types/eslint__js": "^8.42.3",
-    "@types/uuid": "^10.0.0",
-    "eslint": "^9.15.0",
-    "eslint-plugin-import": "^2.31.0",
-    "typescript-eslint": "^8.15.0"
-  },
-  "peerDependencies": {
     "typescript": "^5"
   },
   "keywords": [
@@ -35,7 +27,8 @@
     "llm",
     "bus-architecture",
     "typescript",
-    "bun"
+    "bun",
+    "monorepo"
   ],
   "author": "",
   "license": "MIT",
@@ -44,4 +37,3 @@
     "url": "https://github.com/wewei/agentic-os.git"
   }
 }
-

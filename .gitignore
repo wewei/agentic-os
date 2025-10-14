@@ -1,28 +1,16 @@
 # Dependencies
 node_modules/
-bun.lock
+packages/*/node_modules/
 
 # Build outputs
 dist/
 build/
-*.js.map
+*.tsbuildinfo
 
-# Environment variables
+# Environment
 .env
 .env.local
 .env.*.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Test coverage
-coverage/
-.nyc_output/
 
 # Logs
 logs/
@@ -30,8 +18,19 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-bun-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # OS
+.DS_Store
 Thumbs.db
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Bun
+bun.lockb
