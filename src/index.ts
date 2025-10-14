@@ -4,21 +4,25 @@ import { createAgentBus } from './bus';
 import { shell } from './shell';
 
 import type { AgentModule } from './types';
+import type { ShellConfig, PostRequest, PostResponse } from './shell/types';
+
+export type AgentOSConfig = {
+  shell: ShellConfig;
+};
 
 export type AgentOS = {
   with: (module: AgentModule) => AgentOS;
-  start: (port?: number) => Promise<void>;
-  stop: () => Promise<void>;
+  post: (request: PostRequest) => Promise<PostResponse>;
 };
 
-export const createAgentOS = (): AgentOS => {
+export const createAgentOS = (config: AgentOSConfig): AgentOS => {
   console.log('Creating Agent OS...');
 
   // Create Agent Bus with bus controller
   const bus = createAgentBus();
 
-  // Create shell module
-  const shellModule = shell();
+  // Create shell module with config
+  const shellModule = shell(config.shell);
 
   // Register shell immediately (always present)
   shellModule.registerAbilities(bus);
@@ -32,17 +36,8 @@ export const createAgentOS = (): AgentOS => {
       return agentOS;
     },
 
-    start: async (port = 3000): Promise<void> => {
-      // Start shell server
-      console.log(`\nStarting Agent OS on port ${port}...`);
-      await shellModule.start(port);
-      console.log('✓ Agent OS started');
-    },
-
-    stop: async (): Promise<void> => {
-      console.log('\nStopping Agent OS...');
-      await shellModule.stop();
-      console.log('✓ Agent OS stopped');
+    post: async (request: PostRequest): Promise<PostResponse> => {
+      return shellModule.post(request);
     },
   };
 
@@ -54,6 +49,7 @@ export type { AgentBus, AgentModule } from './types';
 export type { Ledger, LedgerConfig } from './ledger';
 export type { ModelManagerConfig } from './model';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';
+export type { ShellMessage, ShellConfig, PostRequest, PostResponse } from './shell/types';
 
 // Export module factories
 export { ledger } from './ledger';

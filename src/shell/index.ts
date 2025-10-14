@@ -1,80 +1,113 @@
-// Shell Module - HTTP API and SSE
+// Shell Module - Message Handler
+
+import { v4 as uuidv4 } from 'uuid';
 
 import { registerShellAbilities } from './abilities';
-import { createRoutes } from './routes';
 
-import type { Server } from 'bun';
-import type { AgentBus, AgentModule } from '../types';
-import type { Routes } from './routes';
+import type { AgentBus, AgentModule, InvokeResult } from '../types';
+import type { ShellConfig, PostRequest, PostResponse } from './types';
 
 type ShellModule = AgentModule & {
-  start: (port: number) => Promise<void>;
-  stop: () => Promise<void>;
+  post: (request: PostRequest) => Promise<PostResponse>;
 };
 
-const createFetchHandler = (routes: Routes) => {
-  return async (req: Request): Promise<Response> => {
-    const url = new URL(req.url);
-
-    // Handle CORS preflight
-    if (req.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      });
-    }
-
-    // POST /send
-    if (url.pathname === '/send' && req.method === 'POST') {
-      return routes.handleSend(req);
-    }
-
-    // GET /stream or /stream/:taskId
-    if (url.pathname.startsWith('/stream') && req.method === 'GET') {
-      const parts = url.pathname.split('/stream/');
-      const taskId = parts[1] || undefined;
-      return routes.handleStream(req, { taskId });
-    }
-
-    // 404
-    return Response.json({ error: 'Not found' }, { status: 404 });
-  };
+const generateCallId = (): string => {
+  return uuidv4().replace(/-/g, '');
 };
 
-export const shell = (): ShellModule => {
+const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
+  if (result.type === 'success') {
+    return result.result;
+  }
+  const errorMsg = result.type === 'error' ? result.error : result.message;
+  throw new Error(`Invoke failed (${result.type}): ${errorMsg}`);
+};
+
+const validatePostRequest = (request: PostRequest): void => {
+  if (typeof request.message !== 'string' || request.message.trim() === '') {
+    throw new Error('Invalid message: must be non-empty string');
+  }
+  if (request.taskId !== undefined && typeof request.taskId !== 'string') {
+    throw new Error('Invalid taskId: must be string');
+  }
+};
+
+const sendToExistingTask = async (
+  callId: string,
+  bus: AgentBus,
+  taskId: string,
+  message: string
+): Promise<{ success: boolean; taskId: string; error?: string }> => {
+  const result = unwrapInvokeResult(await bus.invoke(
+    'task:send',
+    callId,
+    'shell',
+    JSON.stringify({
+      receiverId: taskId,
+      message,
+    })
+  ));
+  const parsed = JSON.parse(result);
+
+  if (!parsed.success) {
+    return { success: false, taskId, error: parsed.error };
+  }
+
+  return { success: true, taskId };
+};
+
+const createNewTask = async (
+  callId: string,
+  bus: AgentBus,
+  message: string
+): Promise<string> => {
+  const result = unwrapInvokeResult(await bus.invoke(
+    'task:spawn',
+    callId,
+    'shell',
+    JSON.stringify({
+      goal: message,
+    })
+  ));
+  const parsed = JSON.parse(result);
+  return parsed.taskId;
+};
+
+export const shell = (config: ShellConfig): ShellModule => {
   let bus: AgentBus | undefined;
-  let server: Server<undefined> | undefined;
 
   return {
     registerAbilities: (agentBus: AgentBus): void => {
       bus = agentBus;
-      registerShellAbilities(bus);
+      registerShellAbilities(bus, config.onMessage);
     },
 
-    start: async (port: number): Promise<void> => {
+    post: async (request: PostRequest): Promise<PostResponse> => {
       if (!bus) {
         throw new Error('Shell not initialized: registerAbilities must be called first');
       }
 
-      const routes = createRoutes(bus);
-      const fetchHandler = createFetchHandler(routes);
+      validatePostRequest(request);
 
-      server = Bun.serve({
-        port,
-        fetch: fetchHandler,
-      });
+      const { message, taskId } = request;
+      const callId = generateCallId();
 
-      console.log(`Shell listening on http://localhost:${port}`);
-    },
+      let targetTaskId: string;
 
-    stop: async (): Promise<void> => {
-      if (server) {
-        server.stop();
-        console.log('Shell stopped');
+      if (taskId) {
+        const result = await sendToExistingTask(callId, bus, taskId, message);
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to send message to task');
+        }
+        targetTaskId = result.taskId;
+      } else {
+        targetTaskId = await createNewTask(callId, bus, message);
       }
+
+      return {
+        taskId: targetTaskId,
+        status: 'running',
+      };
     },
   };
 };

@@ -2,9 +2,8 @@
 
 import { z } from 'zod';
 
-import { sendSSEEvent } from './sse';
-
 import type { AgentBus, AbilityMeta } from '../types';
+import type { ShellMessage } from './types';
 
 // Schema definitions
 const SHELL_SEND_INPUT_SCHEMA = z.object({
@@ -25,49 +24,56 @@ const SHELL_SEND_META: AbilityMeta<
 > = {
   moduleName: 'shell',
   abilityName: 'send',
-  description: 'Send message chunk to user via SSE',
+  description: 'Send message chunk to user via callback',
   inputSchema: SHELL_SEND_INPUT_SCHEMA,
   outputSchema: SHELL_SEND_OUTPUT_SCHEMA,
 };
 
 type ShellSendInput = z.infer<typeof SHELL_SEND_INPUT_SCHEMA>;
 
-const handleShellSend = async (taskId: string, input: ShellSendInput) => {
-  const success = sendSSEEvent(taskId, {
-    type: 'content',
-    taskId,
-    content: input.content,
-    messageId: input.messageId,
-    index: input.index,
-  });
+const handleShellSend = async (
+  taskId: string,
+  input: ShellSendInput,
+  onMessage: (message: ShellMessage) => void
+) => {
+  try {
+    onMessage({
+      type: 'content',
+      taskId,
+      content: input.content,
+      messageId: input.messageId,
+      index: input.index,
+    });
 
-  if (!success) {
+    if (input.index < 0) {
+      onMessage({
+        type: 'message_complete',
+        taskId,
+        messageId: input.messageId,
+      });
+    }
+
+    return {
+      type: 'success' as const,
+      result: { success: true }
+    };
+  } catch (error) {
     return {
       type: 'success' as const,
       result: {
         success: false,
-        error: `No active SSE connection for task ${taskId}`,
+        error: error instanceof Error ? error.message : 'Unknown error',
       }
     };
   }
-
-  if (input.index < 0) {
-    sendSSEEvent(taskId, {
-      type: 'message_complete',
-      taskId,
-      messageId: input.messageId,
-    });
-  }
-
-  return {
-    type: 'success' as const,
-    result: { success: true }
-  };
 };
 
-export const registerShellAbilities = (bus: AgentBus): void => {
+export const registerShellAbilities = (
+  bus: AgentBus,
+  onMessage: (message: ShellMessage) => void
+): void => {
   bus.register('shell:send', SHELL_SEND_META, async (_callId, taskId, input) => {
-    return handleShellSend(taskId, input);
+    return handleShellSend(taskId, input, onMessage);
   });
 };
 

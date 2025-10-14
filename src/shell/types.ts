@@ -1,24 +1,8 @@
 // Shell types
 
-export type SSEConnection = {
-  taskId: string;
-  controller: ReadableStreamDefaultController;
-  messageBuffer: Map<string, Array<{ content: string; index: number }>>;
-};
-
-export type SendRequest = {
-  message: string;
-  taskId?: string;
-};
-
-export type SendResponse = {
-  taskId: string;
-  status: string;
-};
-
-export type SSEEvent = {
+export type ShellMessage = {
   type: 'start' | 'content' | 'tool_call' | 'tool_result' | 'message_complete' | 'end' | 'error';
-  taskId?: string;
+  taskId: string;
   content?: string;
   messageId?: string;
   index?: number;
@@ -27,5 +11,19 @@ export type SSEEvent = {
   result?: unknown;
   status?: string;
   error?: string;
+};
+
+export type ShellConfig = {
+  onMessage: (message: ShellMessage) => void;
+};
+
+export type PostRequest = {
+  message: string;
+  taskId?: string;
+};
+
+export type PostResponse = {
+  taskId: string;
+  status: string;
 };
 
