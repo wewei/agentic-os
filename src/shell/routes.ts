@@ -76,7 +76,7 @@ const createNewTask = async (callId: string, bus: AgentBus, message: string): Pr
 
 export type Routes = {
   handleSend: (req: Request) => Promise<Response>;
-  handleStream: (req: Request, params: { taskId: string }) => Response;
+  handleStream: (req: Request, params: { taskId?: string }) => Response;
 };
 
 export const createRoutes = (bus: AgentBus): Routes => {
@@ -116,7 +116,8 @@ export const createRoutes = (bus: AgentBus): Routes => {
   };
 
   // GET /stream/:taskId - SSE stream for task output
-  const handleStream = (req: Request, params: { taskId: string }): Response => {
+  // GET /stream - SSE stream for all tasks
+  const handleStream = (req: Request, params: { taskId?: string }): Response => {
     const { taskId } = params;
 
     const stream = createSSEStream(taskId);

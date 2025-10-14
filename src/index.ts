@@ -46,13 +46,13 @@ export const createAgentOS = (): AgentOS => {
 
       // Start shell server
       console.log(`\nStarting Agent OS on port ${port}...`);
-      await shellModule.getShell().start(port);
+      await shellModule.start(port);
       console.log('✓ Agent OS started');
     },
 
     stop: async (): Promise<void> => {
       console.log('\nStopping Agent OS...');
-      await shellModule.getShell().stop();
+      await shellModule.stop();
       console.log('✓ Agent OS stopped');
     },
   };
@@ -64,7 +64,6 @@ export const createAgentOS = (): AgentOS => {
 export type { AgentBus, AgentModule } from './types';
 export type { Ledger, LedgerConfig } from './ledger';
 export type { ModelManagerConfig } from './model';
-export type { Shell } from './shell';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';
 
 // Export module factories
