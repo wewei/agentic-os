@@ -58,8 +58,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wewei/agentic-os.git",
+    "url": "git+https://github.com/wewei/agentic-os.git",
     "directory": "packages/core"
   }
 }
-
