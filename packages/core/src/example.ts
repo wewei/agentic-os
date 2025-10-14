@@ -1,7 +1,5 @@
 // Example: Agentic OS with HTTP Server
 
-import type { Server } from 'bun';
-
 import {
   createAgenticOS,
   modelManager,
@@ -11,6 +9,9 @@ import {
   type ShellMessage,
   type AgenticOS,
 } from './index';
+
+import type { Server } from 'bun';
+
 
 // SSE Connection Management
 type SSEConnection = {

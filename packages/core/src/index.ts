@@ -3,8 +3,8 @@
 import { createSystemBus } from './bus';
 import { shell } from './shell';
 
-import type { Module } from './types';
 import type { ShellConfig, PostRequest, PostResponse } from './shell/types';
+import type { Module } from './types';
 
 export type AgenticOSConfig = {
   shell: ShellConfig;
