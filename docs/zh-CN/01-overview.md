@@ -1,18 +1,18 @@
-# Agent OS 架构概览
+# Agentic OS 架构概览
 
 ## 简介
 
-Agent OS 是使用**操作系统总线架构**对 Agent 系统的完全重写。该设计从操作系统概念中汲取灵感：Shell（用户界面）、Task Manager（进程管理）、Ledger（事务日志）、Memory（语义索引）、Model Manager（ABI），以及用于模块间通信的中央 Agent Bus。
+Agentic OS 是使用**操作系统总线架构**对 Agent 系统的完全重写。该设计从操作系统概念中汲取灵感：Shell（用户界面）、Task Manager（进程管理）、Ledger（事务日志）、Memory（语义索引）、Model Manager（ABI），以及用于模块间通信的中央 System Bus。
 
 ## 核心概念
 
 ### 总线架构
 
-与传统的分层架构不同，Agent OS 使用**基于总线的架构**，所有模块通过中央 Agent Bus 进行通信。这解耦了依赖关系，并支持灵活的模块组合。
+与传统的分层架构不同，Agentic OS 使用**基于总线的架构**，所有模块通过中央 System Bus 进行通信。这解耦了依赖关系，并支持灵活的模块组合。
 
 ```
       ╔══════════════════════════════════════════════════════════╗
-      ║              Agent Bus Controller                        ║
+      ║              System Bus Controller                       ║
       ║  - invoke(callerId, abilityId, input)                    ║
       ║  - Ability Discovery (list/schema/inspect)               ║
       ╚══════════════════════════════════════════════════════════╝
@@ -60,7 +60,7 @@ Agent OS 是使用**操作系统总线架构**对 Agent 系统的完全重写。
 - 维护 SSE 连接用于向用户流式传输消息
 - 无状态请求处理器
 
-### 2. Agent Bus Controller
+### 2. System Bus Controller
 
 **目的**：中央通信枢纽和能力注册表
 
@@ -219,7 +219,7 @@ src/service/agent-os/
 
 ### 1. 总线优先通信
 
-所有模块间通信都通过 Agent Bus 进行。没有直接的模块到模块依赖。
+所有模块间通信都通过 System Bus 进行。没有直接的模块到模块依赖。
 
 **正确**：
 ```typescript
@@ -395,7 +395,7 @@ Bus Controller 提供内省能力：
 
 ## 与现有系统的集成
 
-Agent OS 与现有的 `agent/` 实现并行开发：
+Agentic OS 与现有的 `agent/` 实现并行开发：
 
 ```
 src/service/
@@ -423,7 +423,7 @@ src/service/
 
 ## 总结
 
-Agent OS 架构提供：
+Agentic OS 架构提供：
 
 ✅ **统一能力总线**所有模块都在总线上注册能力  
 ✅ **简化调用协议** `invoke(callerId, abilityId, input)`  
@@ -444,5 +444,5 @@ Agent OS 架构提供：
 - LLM 不需要关心流式处理的中间过程
 - Task Manager 负责处理 LLM 流式响应
 
-OS 类比使系统直观：Shell 用于用户交互和输出，Task Manager 用于进程管理和任务间通信，Ledger 用于事务日志，Memory 用于语义索引，Model Manager 用于硬件抽象，Agent Bus 作为连接一切的系统总线。
+OS 类比使系统直观：Shell 用于用户交互和输出，Task Manager 用于进程管理和任务间通信，Ledger 用于事务日志，Memory 用于语义索引，Model Manager 用于硬件抽象，System Bus 作为连接一切的系统总线。
 

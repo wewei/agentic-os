@@ -1,25 +1,25 @@
-// Agent OS - Main Entry Point
+// Agentic OS - Main Entry Point
 
-import { createAgentBus } from './bus';
+import { createSystemBus } from './bus';
 import { shell } from './shell';
 
-import type { AgentModule } from './types';
+import type { Module } from './types';
 import type { ShellConfig, PostRequest, PostResponse } from './shell/types';
 
-export type AgentOSConfig = {
+export type AgenticOSConfig = {
   shell: ShellConfig;
 };
 
-export type AgentOS = {
-  with: (module: AgentModule) => AgentOS;
+export type AgenticOS = {
+  with: (module: Module) => AgenticOS;
   post: (request: PostRequest) => Promise<PostResponse>;
 };
 
-export const createAgentOS = (config: AgentOSConfig): AgentOS => {
-  console.log('Creating Agent OS...');
+export const createAgenticOS = (config: AgenticOSConfig): AgenticOS => {
+  console.log('Creating Agentic OS...');
 
-  // Create Agent Bus with bus controller
-  const bus = createAgentBus();
+  // Create System Bus with bus controller
+  const bus = createSystemBus();
 
   // Create shell module with config
   const shellModule = shell(config.shell);
@@ -27,13 +27,13 @@ export const createAgentOS = (config: AgentOSConfig): AgentOS => {
   // Register shell immediately (always present)
   shellModule.registerAbilities(bus);
 
-  console.log('✓ Agent OS created with minimal bus and shell');
+  console.log('✓ Agentic OS created with minimal bus and shell');
 
-  const agentOS: AgentOS = {
-    with: (module: AgentModule): AgentOS => {
+  const agenticOS: AgenticOS = {
+    with: (module: Module): AgenticOS => {
       // Register module immediately when added
       module.registerAbilities(bus);
-      return agentOS;
+      return agenticOS;
     },
 
     post: async (request: PostRequest): Promise<PostResponse> => {
@@ -41,11 +41,11 @@ export const createAgentOS = (config: AgentOSConfig): AgentOS => {
     },
   };
 
-  return agentOS;
+  return agenticOS;
 };
 
 // Export types
-export type { AgentBus, AgentModule } from './types';
+export type { SystemBus, Module } from './types';
 export type { Ledger, LedgerConfig } from './ledger';
 export type { ModelManagerConfig } from './model';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';

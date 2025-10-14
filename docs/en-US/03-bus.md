@@ -1,8 +1,8 @@
-# Agent OS - Agent Bus
+# Agentic OS - System Bus
 
 ## Overview
 
-The **Agent Bus** is the central communication hub of Agent OS. Like a system bus in hardware, it enables decoupled communication between all modules. Every capability in the system is accessed through the bus via a uniform interface.
+The **System Bus** is the central communication hub of Agentic OS. Like a system bus in hardware, it enables decoupled communication between all modules. Every capability in the system is accessed through the bus via a uniform interface.
 
 ## Core Concepts
 
@@ -25,7 +25,7 @@ An **Ability** is a callable unit of functionality registered on the bus. Every 
                     │ invoke('task:spawn')(input)
                     ▼
 ┌─────────────────────────────────────────────────┐
-│              Agent Bus Controller               │
+│              System Bus Controller              │
 │                                                 │
 │  ┌──────────────────────────────────────────┐  │
 │  │         Ability Registry                 │  │

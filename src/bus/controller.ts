@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { listModules, listAbilitiesForModule, getAbility } from './registry';
 
-import type { AgentBus, AbilityMeta } from '../types';
+import type { SystemBus, AbilityMeta } from '../types';
 import type { BusState } from './types';
 
 // Schema definitions
@@ -91,21 +91,21 @@ const BUS_INSPECT_META: AbilityMeta<BusInspectInput, BusInspectOutput> = {
   outputSchema: BUS_INSPECT_OUTPUT_SCHEMA,
 };
 
-const registerListAbility = (state: BusState, bus: AgentBus): void => {
+const registerListAbility = (state: BusState, bus: SystemBus): void => {
   bus.register('bus:list', BUS_LIST_META, async () => {
     const modules = listModules(state);
     return { type: 'success', result: { modules } };
   });
 };
 
-const registerAbilitiesAbility = (state: BusState, bus: AgentBus): void => {
+const registerAbilitiesAbility = (state: BusState, bus: SystemBus): void => {
   bus.register('bus:abilities', BUS_ABILITIES_META, async (_callId, _taskId, input: BusAbilitiesInput) => {
     const abilities = listAbilitiesForModule(state, input.moduleName);
     return { type: 'success', result: { moduleName: input.moduleName, abilities } };
   });
 };
 
-const registerSchemaAbility = (state: BusState, bus: AgentBus): void => {
+const registerSchemaAbility = (state: BusState, bus: SystemBus): void => {
   bus.register('bus:schema', BUS_SCHEMA_META, async (_callId, _taskId, input: BusSchemaInput) => {
     const ability = getAbility(state, input.abilityId);
 
@@ -127,7 +127,7 @@ const registerSchemaAbility = (state: BusState, bus: AgentBus): void => {
   });
 };
 
-const registerInspectAbility = (state: BusState, bus: AgentBus): void => {
+const registerInspectAbility = (state: BusState, bus: SystemBus): void => {
   bus.register('bus:inspect', BUS_INSPECT_META, async (_callId, _taskId, input: BusInspectInput) => {
     const ability = getAbility(state, input.abilityId);
 
@@ -145,7 +145,7 @@ const registerInspectAbility = (state: BusState, bus: AgentBus): void => {
   });
 };
 
-export const registerBusControllerAbilities = (state: BusState, bus: AgentBus): void => {
+export const registerBusControllerAbilities = (state: BusState, bus: SystemBus): void => {
   registerListAbility(state, bus);
   registerAbilitiesAbility(state, bus);
   registerSchemaAbility(state, bus);

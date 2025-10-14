@@ -1,8 +1,8 @@
-# Agent OS - Shell 模块
+# Agentic OS - Shell 模块
 
 ## 概述
 
-**Shell** 是 Agent OS 的面向用户的 HTTP API 层。就像操作系统的 shell 一样，它为外部客户端提供与系统交互的命令接口。Shell 位于 **Agent Bus 之上**，充当总线能力的纯消费者。
+**Shell** 是 Agentic OS 的面向用户的 HTTP API 层。就像操作系统的 shell 一样，它为外部客户端提供与系统交互的命令接口。Shell 位于 **System Bus 之上**，充当总线能力的纯消费者。
 
 ## 设计原则
 

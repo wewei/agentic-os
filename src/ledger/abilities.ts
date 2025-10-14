@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 
-import type { AgentBus, AbilityMeta, Task, Call, Message } from '../types';
+import type { SystemBus, AbilityMeta, Task, Call, Message } from '../types';
 import type { Ledger } from './types';
 
 // Schema definitions
@@ -145,7 +145,7 @@ const LEDGER_MSG_LIST_META: AbilityMeta<LedgerMsgListInput, LedgerMsgListOutput>
   outputSchema: LEDGER_MSG_LIST_OUTPUT_SCHEMA,
 };
 
-const registerTaskSaveAbility = (ledger: Ledger, bus: AgentBus): void => {
+const registerTaskSaveAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:task:save', LEDGER_TASK_SAVE_META, async (_callId, _taskId, input: LedgerTaskSaveInput) => {
     const { task } = input as { task: Task };
     await ledger.saveTask(task);
@@ -153,21 +153,21 @@ const registerTaskSaveAbility = (ledger: Ledger, bus: AgentBus): void => {
   });
 };
 
-const registerTaskGetAbility = (ledger: Ledger, bus: AgentBus): void => {
+const registerTaskGetAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:task:get', LEDGER_TASK_GET_META, async (_callId, _taskId, input: LedgerTaskGetInput) => {
     const task = await ledger.getTask(input.taskId);
     return { type: 'success', result: { task } };
   });
 };
 
-const registerTaskQueryAbility = (ledger: Ledger, bus: AgentBus): void => {
+const registerTaskQueryAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:task:query', LEDGER_TASK_QUERY_META, async (_callId, _taskId, input: LedgerTaskQueryInput) => {
     const result = await ledger.queryTasks(input);
     return { type: 'success', result };
   });
 };
 
-const registerCallSaveAbility = (ledger: Ledger, bus: AgentBus): void => {
+const registerCallSaveAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:call:save', LEDGER_CALL_SAVE_META, async (_callId, _taskId, input: LedgerCallSaveInput) => {
     const { call } = input as { call: Call };
     await ledger.saveCall(call);
@@ -175,14 +175,14 @@ const registerCallSaveAbility = (ledger: Ledger, bus: AgentBus): void => {
   });
 };
 
-const registerCallListAbility = (ledger: Ledger, bus: AgentBus): void => {
+const registerCallListAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:call:list', LEDGER_CALL_LIST_META, async (_callId, _taskId, input: LedgerCallListInput) => {
     const calls = await ledger.listCalls({ taskId: input.taskId });
     return { type: 'success', result: { calls } };
   });
 };
 
-const registerMsgSaveAbility = (ledger: Ledger, bus: AgentBus): void => {
+const registerMsgSaveAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:msg:save', LEDGER_MSG_SAVE_META, async (_callId, _taskId, input: LedgerMsgSaveInput) => {
     const { message } = input as { message: Message };
     const messageId = await ledger.saveMessage(message);
@@ -190,14 +190,14 @@ const registerMsgSaveAbility = (ledger: Ledger, bus: AgentBus): void => {
   });
 };
 
-const registerMsgListAbility = (ledger: Ledger, bus: AgentBus): void => {
+const registerMsgListAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:msg:list', LEDGER_MSG_LIST_META, async (_callId, _taskId, input: LedgerMsgListInput) => {
     const result = await ledger.listMessages(input);
     return { type: 'success', result };
   });
 };
 
-export const registerLedgerAbilities = (ledger: Ledger, bus: AgentBus): void => {
+export const registerLedgerAbilities = (ledger: Ledger, bus: SystemBus): void => {
   registerTaskSaveAbility(ledger, bus);
   registerTaskGetAbility(ledger, bus);
   registerTaskQueryAbility(ledger, bus);

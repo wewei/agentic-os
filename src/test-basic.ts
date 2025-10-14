@@ -1,11 +1,11 @@
 // Basic functionality test for Agent OS
 
-import { createAgentBus } from './bus';
+import { createSystemBus } from './bus';
 
 import { modelManager, taskManager, ledger } from './index';
 
 import type { ModelManagerConfig } from './model';
-import type { AgentBus, InvokeResult } from './types';
+import type { SystemBus, InvokeResult } from './types';
 
 const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
   if (result.type === 'success') {
@@ -15,10 +15,10 @@ const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
   throw new Error(`Invoke failed (${result.type}): ${errorMsg}`);
 };
 
-const createTestBus = (): AgentBus => {
+const createTestBus = (): SystemBus => {
   console.log('1. Creating test bus with modules...');
   
-  const bus = createAgentBus();
+  const bus = createSystemBus();
   
   const modelConfig: ModelManagerConfig = {
     providers: {
@@ -43,14 +43,14 @@ const createTestBus = (): AgentBus => {
   return bus;
 };
 
-const testBusAbilities = async (bus: AgentBus) => {
+const testBusAbilities = async (bus: SystemBus) => {
   console.log('2. Testing Bus abilities...');
   const modules = unwrapInvokeResult(await bus.invoke('bus:list', 'test-call-1', 'test', '{}'));
   const modulesData = JSON.parse(modules) as { modules: Array<{ name: string }> };
   console.log('✓ Modules:', modulesData.modules.map((m) => m.name).join(', '));
 };
 
-const testModelManager = async (bus: AgentBus) => {
+const testModelManager = async (bus: SystemBus) => {
   console.log('\n3. Testing Model Manager...');
   const models = unwrapInvokeResult(await bus.invoke('model:listLLM', 'test-call-2', 'test', '{}'));
   const modelsData = JSON.parse(models) as {
@@ -62,7 +62,7 @@ const testModelManager = async (bus: AgentBus) => {
   );
 };
 
-const testTaskManager = async (bus: AgentBus) => {
+const testTaskManager = async (bus: SystemBus) => {
   console.log('\n4. Testing Task Manager...');
   const spawnResult = unwrapInvokeResult(await bus.invoke(
     'task:spawn',

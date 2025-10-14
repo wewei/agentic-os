@@ -1,10 +1,10 @@
-# Agent OS - Ledger
+# Agentic OS - Ledger
 
 ## 概述
 
-**Ledger** 是 Agent OS 的持久化存储层。就像操作系统的事务日志一样，它记录任务执行的完整历史，具有完全的可审计性和可恢复性。
+**Ledger** 是 Agentic OS 的持久化存储层。就像操作系统的事务日志一样，它记录任务执行的完整历史，具有完全的可审计性和可恢复性。
 
-Ledger 位于 **Agent Bus 之下**：它注册存储和查询 Task、Call 和 Message 实体的能力，同时通过 SQLite 事务确保数据一致性。
+Ledger 位于 **System Bus 之下**：它注册存储和查询 Task、Call 和 Message 实体的能力，同时通过 SQLite 事务确保数据一致性。
 
 ### 关键特征
 

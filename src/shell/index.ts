@@ -4,10 +4,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { registerShellAbilities } from './abilities';
 
-import type { AgentBus, AgentModule, InvokeResult } from '../types';
+import type { SystemBus, Module, InvokeResult } from '../types';
 import type { ShellConfig, PostRequest, PostResponse } from './types';
 
-type ShellModule = AgentModule & {
+type ShellModule = Module & {
   post: (request: PostRequest) => Promise<PostResponse>;
 };
 
@@ -34,7 +34,7 @@ const validatePostRequest = (request: PostRequest): void => {
 
 const sendToExistingTask = async (
   callId: string,
-  bus: AgentBus,
+  bus: SystemBus,
   taskId: string,
   message: string
 ): Promise<{ success: boolean; taskId: string; error?: string }> => {
@@ -58,7 +58,7 @@ const sendToExistingTask = async (
 
 const createNewTask = async (
   callId: string,
-  bus: AgentBus,
+  bus: SystemBus,
   message: string
 ): Promise<string> => {
   const result = unwrapInvokeResult(await bus.invoke(
@@ -74,11 +74,11 @@ const createNewTask = async (
 };
 
 export const shell = (config: ShellConfig): ShellModule => {
-  let bus: AgentBus | undefined;
+  let bus: SystemBus | undefined;
 
   return {
-    registerAbilities: (agentBus: AgentBus): void => {
-      bus = agentBus;
+    registerAbilities: (systemBus: SystemBus): void => {
+      bus = systemBus;
       registerShellAbilities(bus, config.onMessage);
     },
 

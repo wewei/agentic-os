@@ -98,10 +98,10 @@ export type RegisteredAbility = {
 };
 
 // ============================================================================
-// Agent Bus Types
+// System Bus Types
 // ============================================================================
 
-export type AgentBus = {
+export type SystemBus = {
   invoke: (abilityId: string, callId: string, callerId: string, input: string) => Promise<InvokeResult<string, string>>;
   register: <TInput, TOutput>(
     abilityId: string,
@@ -113,11 +113,11 @@ export type AgentBus = {
 };
 
 // ============================================================================
-// Agent Module Types
+// Module Types
 // ============================================================================
 
-export type AgentModule = {
-  registerAbilities: (bus: AgentBus) => void;
+export type Module = {
+  registerAbilities: (bus: SystemBus) => void;
 };
 
 // ============================================================================

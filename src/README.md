@@ -1,12 +1,12 @@
-# Agent OS MVP
+# Agentic OS MVP
 
-Agent OS 是一个基于总线架构的 Agent 系统实现。
+Agentic OS 是一个基于总线架构的 Agent 系统实现。
 
 ## 架构概览
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│              Agent Bus Controller                        │
+│              System Bus Controller                       │
 │  - invoke(callerId, abilityId, input)                    │
 │  - Ability Discovery (list/schema/inspect)               │
 └──────────────────────────────────────────────────────────┘
@@ -28,7 +28,7 @@ Agent OS 是一个基于总线架构的 Agent 系统实现。
 
 ### ✅ Phase 1 完成：基础设施层
 
-- **Agent Bus** (`/bus`)
+- **System Bus** (`/bus`)
   - 能力注册和调用
   - 调用者追踪
   - 输入验证（JSON Schema）
@@ -84,13 +84,13 @@ bun install
 export OPENAI_API_KEY=your-api-key-here
 ```
 
-### 2. 启动 Agent OS
+### 2. 启动 Agentic OS
 
 ```typescript
 // example.ts
-import { createAgentOS } from './src/service/agent-os';
+import { createAgenticOS } from './src/service/agent-os';
 
-const agentOS = await createAgentOS({
+const agenticOS = await createAgenticOS({
   port: 3000,
   models: {
     models: [
@@ -107,7 +107,7 @@ const agentOS = await createAgentOS({
   },
 });
 
-await agentOS.start();
+await agenticOS.start();
 ```
 
 ```bash
@@ -204,7 +204,7 @@ src/service/agent-os/
 ├── index.ts                 # 系统集成入口
 ├── example.ts               # 使用示例
 │
-├── bus/                     # Agent Bus
+├── bus/                     # System Bus
 │   ├── types.ts
 │   ├── registry.ts
 │   ├── controller.ts
@@ -239,7 +239,7 @@ src/service/agent-os/
 
 ## 设计原则
 
-1. **总线优先通信**：所有模块通过 Agent Bus 通信，无直接依赖
+1. **总线优先通信**：所有模块通过 System Bus 通信，无直接依赖
 2. **统一能力接口**：`invoke(callerId, abilityId, input) => Promise<string>`
 3. **函数式风格**：优先使用纯函数，函数长度 ≤ 50 行
 4. **类型安全**：使用 TypeScript `type` 而非 `interface`

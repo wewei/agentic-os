@@ -1,10 +1,10 @@
-# Agent OS - Ledger
+# Agentic OS - Ledger
 
 ## Overview
 
-The **Ledger** is the persistent storage layer of Agent OS. Like an operating system's transaction log, it records the complete history of task execution with full auditability and recoverability.
+The **Ledger** is the persistent storage layer of Agentic OS. Like an operating system's transaction log, it records the complete history of task execution with full auditability and recoverability.
 
-Ledger sits **below the Agent Bus**: it registers abilities for storing and querying Task, Call, and Message entities while ensuring data consistency through SQLite transactions.
+Ledger sits **below the System Bus**: it registers abilities for storing and querying Task, Call, and Message entities while ensuring data consistency through SQLite transactions.
 
 ### Key Characteristics
 

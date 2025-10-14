@@ -1,15 +1,15 @@
-// Example: Agent OS with HTTP Server
+// Example: Agentic OS with HTTP Server
 
 import type { Server } from 'bun';
 
 import {
-  createAgentOS,
+  createAgenticOS,
   modelManager,
   taskManager,
   ledger,
   type ModelManagerConfig,
   type ShellMessage,
-  type AgentOS,
+  type AgenticOS,
 } from './index';
 
 // SSE Connection Management
@@ -112,7 +112,7 @@ const createSSEStream = (taskId?: string): ReadableStream => {
 };
 
 // HTTP Server
-const createHTTPServer = (agentOS: AgentOS, port: number): Server<undefined> => {
+const createHTTPServer = (agenticOS: AgenticOS, port: number): Server<undefined> => {
   const fetchHandler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
 
@@ -131,7 +131,7 @@ const createHTTPServer = (agentOS: AgentOS, port: number): Server<undefined> => 
     if (url.pathname === '/send' && req.method === 'POST') {
       try {
         const body = await req.json() as { message: string; taskId?: string };
-        const result = await agentOS.post(body);
+        const result = await agenticOS.post(body);
         return Response.json(result);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -188,7 +188,7 @@ const modelConfig: ModelManagerConfig = {
 };
 
 const main = async () => {
-  const agentOS = createAgentOS({
+  const agenticOS = createAgenticOS({
     shell: {
       onMessage: sendToConnections,
     },
@@ -198,7 +198,7 @@ const main = async () => {
     .with(ledger());
 
   const port = 3000;
-  const server = createHTTPServer(agentOS, port);
+  const server = createHTTPServer(agenticOS, port);
 
   console.log(`\n✓ HTTP Server listening on http://localhost:${port}`);
   console.log('  - POST /send - Send message to agent');
@@ -215,7 +215,7 @@ const main = async () => {
 };
 
 main().catch((error) => {
-  console.error('Failed to start Agent OS:', error);
+  console.error('Failed to start Agentic OS:', error);
   process.exit(1);
 });
 

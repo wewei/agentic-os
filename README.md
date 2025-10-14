@@ -1,12 +1,12 @@
-# Agent OS
+# Agentic OS
 
-Agent OS 是一个基于总线架构的 Agent 系统实现。
+Agentic OS 是一个基于总线架构的 Agent 系统实现。
 
 ## 架构概览
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│              Agent Bus Controller                        │
+│              System Bus Controller                       │
 │  - invoke(callerId, abilityId, input)                    │
 │  - Ability Discovery (list/schema/inspect)               │
 └──────────────────────────────────────────────────────────┘
@@ -26,7 +26,7 @@ Agent OS 是一个基于总线架构的 Agent 系统实现。
 
 ## 核心模块
 
-### Agent Bus (`/src/bus`)
+### System Bus (`/src/bus`)
 - 能力注册和调用
 - 调用者追踪
 - 输入验证（JSON Schema）
@@ -70,13 +70,13 @@ bun install
 export OPENAI_API_KEY=your-api-key-here
 ```
 
-### 3. 启动 Agent OS
+### 3. 启动 Agentic OS
 
 ```typescript
 // example.ts
-import { createAgentOS } from './src/index';
+import { createAgenticOS } from './src/index';
 
-const agentOS = await createAgentOS({
+const agenticOS = await createAgenticOS({
   port: 3000,
   models: {
     models: [
@@ -93,7 +93,7 @@ const agentOS = await createAgentOS({
   },
 });
 
-await agentOS.start();
+await agenticOS.start();
 ```
 
 ```bash
@@ -170,7 +170,7 @@ bun run lint:fix
 
 ## 设计原则
 
-1. **总线优先通信**：所有模块通过 Agent Bus 通信，无直接依赖
+1. **总线优先通信**：所有模块通过 System Bus 通信，无直接依赖
 2. **统一能力接口**：`invoke(callerId, abilityId, input) => Promise<string>`
 3. **函数式风格**：优先使用纯函数，函数长度 ≤ 50 行
 4. **类型安全**：使用 TypeScript `type` 而非 `interface`

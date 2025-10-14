@@ -1,10 +1,10 @@
-// Agent Bus Implementation
+// System Bus Implementation
 
 import { registerBusControllerAbilities } from './controller';
 import { registerAbility, unregisterAbility, hasAbility, getAbility } from './registry';
 
 import type { BusState } from './types';
-import type { AgentBus, CallLogEntry, InvokeResult } from '../types';
+import type { SystemBus, CallLogEntry, InvokeResult } from '../types';
 
 const logInvokeFailure = (
   state: BusState,
@@ -66,13 +66,13 @@ const executeInvoke = async (
   }
 };
 
-export const createAgentBus = (): AgentBus => {
+export const createSystemBus = (): SystemBus => {
   const state: BusState = {
     abilities: new Map(),
     callLog: [],
   };
 
-  const bus: AgentBus = {
+  const bus: SystemBus = {
     invoke: async (abilityId: string, callId: string, callerId: string, input: string) => {
       const startTime = Date.now();
       const logEntry: CallLogEntry = {
@@ -103,5 +103,5 @@ export const createAgentBus = (): AgentBus => {
   return bus;
 };
 
-export type { AgentBus } from '../types';
+export type { SystemBus } from '../types';
 

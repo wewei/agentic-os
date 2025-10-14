@@ -1,10 +1,10 @@
-# Agent OS - Model Manager
+# Agentic OS - Model Manager
 
 ## Overview
 
-The **Model Manager** is the ABI (Application Binary Interface) layer of Agent OS. Like an OS abstracts hardware through device drivers, Model Manager provides a unified interface to different LLM providers (OpenAI, Anthropic, etc.) and embedding models.
+The **Model Manager** is the ABI (Application Binary Interface) layer of Agentic OS. Like an OS abstracts hardware through device drivers, Model Manager provides a unified interface to different LLM providers (OpenAI, Anthropic, etc.) and embedding models.
 
-Model Manager sits **below the Agent Bus**: it registers abilities for model invocation while keeping provider-specific details hidden.
+Model Manager sits **below the System Bus**: it registers abilities for model invocation while keeping provider-specific details hidden.
 
 ## Core Concepts
 
@@ -42,7 +42,7 @@ type ModelRegistry = {
 
 ## Registered Abilities
 
-Model Manager registers the following abilities on the Agent Bus:
+Model Manager registers the following abilities on the System Bus:
 
 ### model:llm
 

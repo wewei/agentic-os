@@ -2,10 +2,10 @@
 import { registerTaskAbilities } from './abilities';
 import { createExecuteTask } from './runloop';
 
-import type { AgentModule } from '../types';
+import type { Module } from '../types';
 import type { TaskRegistry } from './types';
 
-export const taskManager = (): AgentModule => {
+export const taskManager = (): Module => {
   const registry: TaskRegistry = new Map();
 
   return {

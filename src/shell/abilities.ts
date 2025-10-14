@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 
-import type { AgentBus, AbilityMeta } from '../types';
+import type { SystemBus, AbilityMeta } from '../types';
 import type { ShellMessage } from './types';
 
 // Schema definitions
@@ -69,7 +69,7 @@ const handleShellSend = async (
 };
 
 export const registerShellAbilities = (
-  bus: AgentBus,
+  bus: SystemBus,
   onMessage: (message: ShellMessage) => void
 ): void => {
   bus.register('shell:send', SHELL_SEND_META, async (_callId, taskId, input) => {

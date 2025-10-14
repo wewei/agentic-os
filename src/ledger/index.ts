@@ -3,14 +3,14 @@
 import { registerLedgerAbilities } from './abilities';
 import { createMockLedger } from './mock';
 
-import type { AgentModule } from '../types';
+import type { Module } from '../types';
 
 export type LedgerConfig = {
   type?: 'mock';
   // Future: add real DB config options
 };
 
-export const ledger = (): AgentModule => {
+export const ledger = (): Module => {
   // For now, only support mock ledger
   const ledgerInstance = createMockLedger();
 

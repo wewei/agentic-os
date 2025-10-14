@@ -1,14 +1,14 @@
-# Agent OS Architecture Overview
+# Agentic OS Architecture Overview
 
 ## Introduction
 
-Agent OS is a complete rewrite of the Agent system using an **Operating System Bus Architecture**. The design draws inspiration from OS concepts: Shell (user interface), Task Manager (process management), Ledger (transaction log), Memory (semantic index), Model Manager (ABI), and a central Agent Bus for inter-module communication.
+Agentic OS is a complete rewrite of the Agent system using an **Operating System Bus Architecture**. The design draws inspiration from OS concepts: Shell (user interface), Task Manager (process management), Ledger (transaction log), Memory (semantic index), Model Manager (ABI), and a central System Bus for inter-module communication.
 
 ## Core Concepts
 
 ### Bus Architecture
 
-Unlike traditional layered architectures, Agent OS uses a **bus-based architecture** where all modules communicate through a central Agent Bus. This decouples dependencies and enables flexible module composition.
+Unlike traditional layered architectures, Agentic OS uses a **bus-based architecture** where all modules communicate through a central System Bus. This decouples dependencies and enables flexible module composition.
 
 ```
                  ┌────────────────────┐
@@ -17,7 +17,7 @@ Unlike traditional layered architectures, Agent OS uses a **bus-based architectu
                             │ invoke/invokeStream
                             ▼
       ╔══════════════════════════════════════════════════════════╗
-      ║              Agent Bus Controller                        ║
+      ║              System Bus Controller                       ║
       ║  - invoke(abilityId)(input)                              ║
       ║  - invokeStream(abilityId)(input)                        ║
       ║  - Ability Discovery (list/schema/inspect)               ║
@@ -55,14 +55,14 @@ Unlike traditional layered architectures, Agent OS uses a **bus-based architectu
 - Accept incoming messages via `POST /send`
 - Stream task output via `GET /stream/:taskId` using SSE
 - Provide inspection endpoints (reserved for future use)
-- Translate HTTP requests to Agent Bus invocations
+- Translate HTTP requests to System Bus invocations
 
 **Key Characteristics**:
 - Does not register any abilities
-- Pure consumer of Agent Bus
+- Pure consumer of System Bus
 - Stateless request handler
 
-### 2. Agent Bus Controller (Below Bus)
+### 2. System Bus Controller (Below Bus)
 
 **Purpose**: Central communication hub and ability registry
 
@@ -214,7 +214,7 @@ src/service/agent-os/
 
 ### 1. Bus-First Communication
 
-All inter-module communication goes through the Agent Bus. No direct module-to-module dependencies.
+All inter-module communication goes through the System Bus. No direct module-to-module dependencies.
 
 **Good**:
 ```typescript
@@ -363,7 +363,7 @@ High-level flow of a user message through the system:
 
 ## Integration with Existing System
 
-Agent OS is developed alongside the existing `agent/` implementation:
+Agentic OS is developed alongside the existing `agent/` implementation:
 
 ```
 src/service/
@@ -391,7 +391,7 @@ Each module is documented in detail:
 
 ## Summary
 
-Agent OS architecture provides:
+Agentic OS architecture provides:
 
 ✅ **Decoupled modules** via bus-based communication
 ✅ **Uniform interfaces** for all abilities
@@ -401,5 +401,5 @@ Agent OS architecture provides:
 ✅ **Clear separation** of concerns (Shell, Task, Model, Ledger, Memory)
 ✅ **Parallel development** alongside existing system
 
-The OS analogy makes the system intuitive: Shell for user interaction, Task Manager for processes, Ledger for transaction log, Memory for semantic index, Model Manager for hardware abstraction, and Agent Bus as the system bus connecting everything.
+The OS analogy makes the system intuitive: Shell for user interaction, Task Manager for processes, Ledger for transaction log, Memory for semantic index, Model Manager for hardware abstraction, and System Bus as the system bus connecting everything.
 

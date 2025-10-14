@@ -1,4 +1,4 @@
-# Agent OS MVP 完成总结
+# Agentic OS MVP 完成总结
 
 ## 🎉 阶段一完成
 

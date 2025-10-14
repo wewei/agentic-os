@@ -1,10 +1,10 @@
-# Agent OS - Model Manager
+# Agentic OS - Model Manager
 
 ## 概述
 
-**Model Manager** 是 Agent OS 的 ABI（应用程序二进制接口）层。就像操作系统通过设备驱动程序抽象硬件一样，Model Manager 为不同的 LLM 提供商（OpenAI、Anthropic 等）和嵌入模型提供统一接口。
+**Model Manager** 是 Agentic OS 的 ABI（应用程序二进制接口）层。就像操作系统通过设备驱动程序抽象硬件一样，Model Manager 为不同的 LLM 提供商（OpenAI、Anthropic 等）和嵌入模型提供统一接口。
 
-Model Manager 位于 **Agent Bus 之下**：它注册模型调用的能力，同时隐藏提供商特定的细节。
+Model Manager 位于 **System Bus 之下**：它注册模型调用的能力，同时隐藏提供商特定的细节。
 
 ## 核心概念
 

@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 
-import type { AgentBus, AbilityMeta, Task, Message, AbilityResult } from '../types';
+import type { SystemBus, AbilityMeta, Task, Message, AbilityResult } from '../types';
 import type { TaskRegistry } from './types';
 
 // Schema definitions
@@ -153,7 +153,7 @@ const unwrapInvokeResult = <R, E>(
 };
 
 const saveTaskAndMessages = async (
-  bus: AgentBus,
+  bus: SystemBus,
   callId: string,
   task: Task,
   messages: Message[]
@@ -167,7 +167,7 @@ const saveTaskAndMessages = async (
 
 const registerSpawnAbility = (
   registry: TaskRegistry,
-  bus: AgentBus,
+  bus: SystemBus,
   executeTask: (taskId: string) => Promise<void>
 ): void => {
   bus.register('task:spawn', TASK_SPAWN_META, async (callId, _taskId, input: TaskSpawnInput) => {
@@ -195,7 +195,7 @@ const registerSpawnAbility = (
 
 const registerSendAbility = (
   registry: TaskRegistry,
-  bus: AgentBus,
+  bus: SystemBus,
   executeTask: (taskId: string) => Promise<void>
 ): void => {
   bus.register('task:send', TASK_SEND_META, async (callId, _taskId, input: TaskSendInput) => {
@@ -284,7 +284,7 @@ const registerActiveAbility = (registry: TaskRegistry, bus: AgentBus): void => {
 
 export const registerTaskAbilities = (
   registry: TaskRegistry,
-  bus: AgentBus,
+  bus: SystemBus,
   executeTask: (taskId: string) => Promise<void>
 ): void => {
   registerSpawnAbility(registry, bus, executeTask);

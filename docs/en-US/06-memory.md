@@ -1,16 +1,16 @@
-# Agent OS - Memory
+# Agentic OS - Memory
 
 ## Overview
 
-The **Memory** module is the semantic knowledge layer of Agent OS. While Ledger stores complete task execution history, Memory extracts knowledge and builds semantic indexes for intelligent retrieval and discovery.
+The **Memory** module is the semantic knowledge layer of Agentic OS. While Ledger stores complete task execution history, Memory extracts knowledge and builds semantic indexes for intelligent retrieval and discovery.
 
-Memory sits **below the Agent Bus**: it registers abilities for semantic search, knowledge graph traversal, and task archiving while reading from Ledger for complete task records.
+Memory sits **below the System Bus**: it registers abilities for semantic search, knowledge graph traversal, and task archiving while reading from Ledger for complete task records.
 
 ### Key Characteristics
 
 **Semantic Layer**: Memory operates at a higher abstraction level than Ledger, focusing on meaning and relationships rather than raw records.
 
-**Optional Enhancement**: Memory is not required for Agent OS to function. Agent can operate with Ledger alone for basic persistence and recovery.
+**Optional Enhancement**: Memory is not required for Agentic OS to function. Agent can operate with Ledger alone for basic persistence and recovery.
 
 **Dual Storage**: 
 - **Chroma**: Vector database for semantic similarity search
@@ -22,7 +22,7 @@ Memory sits **below the Agent Bus**: it registers abilities for semantic search,
 
 ```
 ┌──────────────────────────────────────────────┐
-│            Agent Bus                         │
+│            System Bus                        │
 └────────────┬─────────────────────────────────┘
              │
              ▼

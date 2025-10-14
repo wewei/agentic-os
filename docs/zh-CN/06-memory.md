@@ -1,16 +1,16 @@
-# Agent OS - Memory
+# Agentic OS - Memory
 
 ## 概述
 
-**Memory** 模块是 Agent OS 的语义知识层。Ledger 存储完整的任务执行历史，而 Memory 提取知识并构建语义索引以实现智能检索和发现。
+**Memory** 模块是 Agentic OS 的语义知识层。Ledger 存储完整的任务执行历史，而 Memory 提取知识并构建语义索引以实现智能检索和发现。
 
-Memory 位于 **Agent Bus 之下**：它注册语义搜索、知识图谱遍历和任务归档的能力，同时从 Ledger 读取完整的任务记录。
+Memory 位于 **System Bus 之下**：它注册语义搜索、知识图谱遍历和任务归档的能力，同时从 Ledger 读取完整的任务记录。
 
 ### 关键特征
 
 **语义层**：Memory 在比 Ledger 更高的抽象级别上操作，专注于意义和关系而不是原始记录。
 
-**可选增强**：Memory 不是 Agent OS 运行所必需的。Agent 可以仅使用 Ledger 进行基本的持久化和恢复。
+**可选增强**：Memory 不是 Agentic OS 运行所必需的。Agent 可以仅使用 Ledger 进行基本的持久化和恢复。
 
 **双重存储**： 
 - **Chroma**：用于语义相似度搜索的向量数据库
@@ -22,7 +22,7 @@ Memory 位于 **Agent Bus 之下**：它注册语义搜索、知识图谱遍历�
 
 ```
 ┌──────────────────────────────────────────────┐
-│            Agent Bus                         │
+│            System Bus                        │
 └────────────┬─────────────────────────────────┘
              │
              ▼

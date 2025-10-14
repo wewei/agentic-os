@@ -1,14 +1,14 @@
-# Agent OS - Task Manager
+# Agentic OS - Task Manager
 
 ## Overview
 
-The **Task Manager** is the process management layer of Agent OS. It manages the lifecycle of tasks—from creation through execution to completion—with a **persistence-first architecture**. Unlike traditional in-memory execution models, every aspect of task execution (tasks, ability calls, messages) is continuously persisted to the Ledger, enabling full recovery from unexpected failures.
+The **Task Manager** is the process management layer of Agentic OS. It manages the lifecycle of tasks—from creation through execution to completion—with a **persistence-first architecture**. Unlike traditional in-memory execution models, every aspect of task execution (tasks, ability calls, messages) is continuously persisted to the Ledger, enabling full recovery from unexpected failures.
 
-Task Manager sits **below the Agent Bus**: it both invokes bus abilities (e.g., `model:llm`, `ldg:task:save`) and registers its own lifecycle management abilities (e.g., `task:route`, `task:create`, `task:cancel`).
+Task Manager sits **below the System Bus**: it both invokes bus abilities (e.g., `model:llm`, `ldg:task:save`) and registers its own lifecycle management abilities (e.g., `task:route`, `task:create`, `task:cancel`).
 
 ### Key Design Principles
 
-**Persistence-First**: A task in Agent OS represents an Agent's series of conversations with an LLM to achieve a specific goal. The entire execution process is continuously persisted to Ledger. If the Agent process crashes, it can resume and continue unfinished tasks upon restart based on persisted records.
+**Persistence-First**: A task in Agentic OS represents an Agent's series of conversations with an LLM to achieve a specific goal. The entire execution process is continuously persisted to Ledger. If the Agent process crashes, it can resume and continue unfinished tasks upon restart based on persisted records.
 
 **Clear Separation of Concerns**:
 - **Task Manager**: Core lifecycle operations (routing, creation, cancellation, listing active tasks)

@@ -2,7 +2,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 
-import type { AgentBus, Message, InvokeResult } from '../types';
+import type { SystemBus, Message, InvokeResult } from '../types';
 import type { TaskRegistry, TaskState } from './types';
 import type { ChatMessage, ToolCall } from '../model/types';
 
@@ -42,7 +42,7 @@ const streamContentToUser = async (
   callId: string,
   taskId: string,
   content: string,
-  bus: AgentBus
+  bus: SystemBus
 ): Promise<void> => {
   const messageId = generateMessageId();
   const chunkSize = 50; // Characters per chunk
@@ -133,7 +133,7 @@ const executeToolCall = async (
   taskId: string,
   toolCall: ToolCall,
   messages: Message[],
-  bus: AgentBus
+  bus: SystemBus
 ): Promise<void> => {
   const abilityId = toolCall.function.name.replace('_', ':');
   const args = toolCall.function.arguments;
@@ -176,7 +176,7 @@ const processLLMResponse = async (
   taskId: string,
   llmResult: string,
   messages: Message[],
-  bus: AgentBus
+  bus: SystemBus
 ): Promise<boolean> => {
   const { content, toolCalls, usage } = JSON.parse(llmResult);
 
@@ -223,7 +223,7 @@ const failTask = async (
   taskId: string,
   taskState: TaskState,
   error: unknown,
-  bus: AgentBus
+  bus: SystemBus
 ): Promise<void> => {
   const errorMessage = error instanceof Error ? error.message : String(error);
   console.error(`Task ${taskId} execution error:`, errorMessage);
@@ -237,7 +237,7 @@ const failTask = async (
 
 const getDefaultLLMProvider = async (
   callId: string,
-  bus: AgentBus,
+  bus: SystemBus,
   taskId: string
 ): Promise<{ provider: string; model: string }> => {
   const result = unwrapInvokeResult(await bus.invoke('model:listLLM', callId, taskId, '{}'));
@@ -270,7 +270,7 @@ const runExecutionLoop = async (
   taskId: string,
   messages: Message[],
   tools: ToolDefinition[],
-  bus: AgentBus
+  bus: SystemBus
 ): Promise<void> => {
   // Get default LLM provider and model
   const { provider, model } = await getDefaultLLMProvider(callId, bus, taskId);

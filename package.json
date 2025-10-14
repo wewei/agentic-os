@@ -1,7 +1,7 @@
 {
-  "name": "agent-os",
+  "name": "@agentic-os/core",
   "version": "0.1.0",
-  "description": "Agent OS - A bus-based agent system implementation",
+  "description": "Agentic OS - A bus-based agent system implementation",
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
@@ -41,7 +41,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wewei/agent-os.git"
+    "url": "https://github.com/wewei/agentic-os.git"
   }
 }
 

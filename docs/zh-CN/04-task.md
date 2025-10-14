@@ -1,14 +1,14 @@
-# Agent OS - Task Manager
+# Agentic OS - Task Manager
 
 ## 概述
 
-**Task Manager** 是 Agent OS 的进程管理层。它管理任务的生命周期——从创建到执行再到完成——采用**持久化优先的架构**。与传统的内存执行模型不同，任务执行的每个方面（任务、能力调用、消息）都持续持久化到 Ledger，实现从意外故障中完全恢复。
+**Task Manager** 是 Agentic OS 的进程管理层。它管理任务的生命周期——从创建到执行再到完成——采用**持久化优先的架构**。与传统的内存执行模型不同，任务执行的每个方面（任务、能力调用、消息）都持续持久化到 Ledger，实现从意外故障中完全恢复。
 
-Task Manager 在 **Agent Bus** 上注册能力：它既调用总线能力（例如 `model:llm`、`ldg:task:save`、`shell:send`），又注册自己的生命周期管理和任务间通信能力（例如 `task:spawn`、`task:send`、`task:cancel`）。
+Task Manager 在 **System Bus** 上注册能力：它既调用总线能力（例如 `model:llm`、`ldg:task:save`、`shell:send`），又注册自己的生命周期管理和任务间通信能力（例如 `task:spawn`、`task:send`、`task:cancel`）。
 
 ### 关键设计原则
 
-**持久化优先**：Agent OS 中的任务代表 Agent 与 LLM 的一系列对话，以实现特定目标。整个执行过程持续持久化到 Ledger。如果 Agent 进程崩溃，它可以在重启时基于持久化记录恢复并继续未完成的任务。
+**持久化优先**：Agentic OS 中的任务代表 Agent 与 LLM 的一系列对话，以实现特定目标。整个执行过程持续持久化到 Ledger。如果 Agent 进程崩溃，它可以在重启时基于持久化记录恢复并继续未完成的任务。
 
 **清晰的关注点分离**：
 - **Task Manager**：核心生命周期操作（路由、创建、取消、列出活动任务）

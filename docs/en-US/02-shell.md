@@ -1,8 +1,8 @@
-# Agent OS - Shell Module
+# Agentic OS - Shell Module
 
 ## Overview
 
-The **Shell** is the user-facing HTTP API layer of Agent OS. Like an operating system shell, it provides a command interface for external clients to interact with the system. The Shell sits **above the Agent Bus** and acts as a pure consumer of bus abilities.
+The **Shell** is the user-facing HTTP API layer of Agentic OS. Like an operating system shell, it provides a command interface for external clients to interact with the system. The Shell sits **above the System Bus** and acts as a pure consumer of bus abilities.
 
 ## Design Principles
 

@@ -3,7 +3,7 @@
 import { registerModelAbilities } from './abilities';
 import { createOpenAIAdapter } from './providers/openai';
 
-import type { AgentModule } from '../types';
+import type { Module } from '../types';
 import type { ProviderRegistry, ProviderAdapter, ProviderConfig, AdapterType } from './types';
 
 export type ModelManagerConfig = {
@@ -27,7 +27,7 @@ const createAdapterRegistry = (): Map<string, ProviderAdapter> => {
   return registry;
 };
 
-export const modelManager = (config: ModelManagerConfig): AgentModule => {
+export const modelManager = (config: ModelManagerConfig): Module => {
   const registry: ProviderRegistry = new Map();
 
   // Build provider registry from config

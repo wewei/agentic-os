@@ -1,4 +1,4 @@
-# Agent OS 实现状态
+# Agentic OS 实现状态
 
 ## 阶段一：MVP (Mock Ledger) - ✅ 已完成
 
@@ -7,7 +7,7 @@
 
 ### 已实现的模块
 
-#### 1. Agent Bus ✅
+#### 1. System Bus ✅
 **位置**: `src/service/agent-os/bus/`
 
 **实现内容**:

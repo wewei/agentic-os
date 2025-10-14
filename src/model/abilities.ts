@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 
-import type { AgentBus, AbilityMeta, AbilityResult } from '../types';
+import type { SystemBus, AbilityMeta, AbilityResult } from '../types';
 import type {
   ProviderRegistry,
   ProviderConfig,
@@ -126,7 +126,7 @@ const handleStreamCompletion = async (
   model: string,
   messages: ChatMessage[],
   options: CompletionOptions,
-  bus: AgentBus
+  bus: SystemBus
 ): Promise<string> => {
   let fullContent = '';
   let finalToolCalls: ToolCall[] | undefined;
@@ -169,7 +169,7 @@ const handleLLMInvoke = async (
   input: ModelLLMInput,
   registry: ProviderRegistry,
   adapters: Map<string, ProviderAdapter>,
-  bus: AgentBus
+  bus: SystemBus
 ): Promise<AbilityResult<ModelLLMOutput, string>> => {
   const validation = validateProviderAndModel(input.provider, input.model, registry, adapters);
   if (!validation.success) {
@@ -197,7 +197,7 @@ const handleLLMInvoke = async (
 const registerLLMAbility = (
   registry: ProviderRegistry,
   adapters: Map<string, ProviderAdapter>,
-  bus: AgentBus
+  bus: SystemBus
 ): void => {
   bus.register('model:llm', MODEL_LLM_META, async (callId, taskId, input) =>
     handleLLMInvoke(callId, taskId, input, registry, adapters, bus)
@@ -265,7 +265,7 @@ const registerListEmbedAbility = (registry: ProviderRegistry, bus: AgentBus): vo
 export const registerModelAbilities = (
   registry: ProviderRegistry,
   adapters: Map<string, ProviderAdapter>,
-  bus: AgentBus
+  bus: SystemBus
 ): void => {
   registerLLMAbility(registry, adapters, bus);
   registerListLLMAbility(registry, bus);
