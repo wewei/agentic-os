@@ -2,9 +2,26 @@
   "name": "@agentic-os/core",
   "version": "0.1.0",
   "description": "Agentic OS Core - Bus-based agent system implementation",
+  "main": "src/index.ts",
   "module": "src/index.ts",
+  "types": "src/index.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "prepublishOnly": "bun run lint",
     "dev": "bun --watch src/example.ts",
     "start": "bun run src/example.ts",
     "test": "bun test",
