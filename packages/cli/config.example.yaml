@@ -6,6 +6,18 @@ cli:
   theme: default
   # Maximum number of messages to keep in history
   messageLimit: 1000
+  # Layout configuration for responsive TUI
+  layout:
+    # Ratio of screen height for message box (0.0 to 1.0)
+    messageBoxRatio: 0.8
+    # Minimum height for message box (in lines)
+    minMessageBoxHeight: 6
+    # Minimum height for input box (in lines)
+    minInputBoxHeight: 3
+    # Minimum screen width (in characters)
+    minScreenWidth: 20
+    # Minimum screen height (in lines)
+    minScreenHeight: 10
 
 model:
   # LLM provider (e.g., 'openai', 'anthropic')

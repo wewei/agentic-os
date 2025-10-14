@@ -1,4 +1,4 @@
-import type { Widgets } from 'blessed';
+import type { ReactNode } from 'react';
 
 /**
  * Configuration for the entire application, organized by module
@@ -26,12 +26,14 @@ export type AppState = {
 };
 
 /**
- * Blessed UI components
+ * Layout configuration for responsive design
  */
-export type UIComponents = {
-  screen: Widgets.Screen;
-  messageBox: Widgets.BoxElement;
-  inputBox: Widgets.TextboxElement;
+export type LayoutConfig = {
+  messageBoxRatio: number;
+  minMessageBoxHeight: number;
+  minInputBoxHeight: number;
+  minScreenWidth: number;
+  minScreenHeight: number;
 };
 
 /**
@@ -42,3 +44,38 @@ export type EventHandlers = {
   onExit: () => void;
 };
 
+/**
+ * Props for the main App component
+ */
+export type AppProps = {
+  config: AppConfig;
+  layoutConfig?: Partial<LayoutConfig>;
+  screen?: any;
+};
+
+/**
+ * Props for the MessageBox component
+ */
+export type MessageBoxProps = {
+  messages: Message[];
+  height: number;
+  width: number;
+};
+
+/**
+ * Props for the InputBox component
+ */
+export type InputBoxProps = {
+  onSubmit: (input: string) => void;
+  onExit: () => void;
+  height: number;
+  width: number;
+};
+
+/**
+ * Props for the Screen component
+ */
+export type ScreenProps = {
+  children: ReactNode;
+  onResize?: (width: number, height: number) => void;
+};

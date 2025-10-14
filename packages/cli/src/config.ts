@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
-import { join, dirname } from 'path';
+import { join } from 'path';
 
 import yaml from 'js-yaml';
 
@@ -37,6 +37,13 @@ export const getDefaultConfig = (): AppConfig => ({
   cli: {
     theme: 'default',
     messageLimit: 1000,
+    layout: {
+      messageBoxRatio: 0.8,
+      minMessageBoxHeight: 6,
+      minInputBoxHeight: 3,
+      minScreenWidth: 20,
+      minScreenHeight: 10,
+    },
   },
   model: {
     provider: 'openai',
@@ -116,4 +123,3 @@ export const updateModuleConfig = (
     },
   };
 };
-
