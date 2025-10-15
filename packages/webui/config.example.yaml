@@ -1,29 +1,29 @@
-# Agentic OS WebUI Configuration Example
-# Copy this file to config.yaml and customize as needed
+# Agentic OS Configuration Example
+# Copy this file to $HOME/.agent-os/config.yaml and customize as needed
 
-# Server configuration
-server:
+# WebUI configuration
+webui:
   port: 3000  # Port for the WebUI server
   cors:
     origin: "*"  # CORS origin (use "*" for development, specific domain for production)
     credentials: false  # Allow credentials in CORS requests
 
-# Static file serving
-static:
-  path: "./frontend/dist"  # Path to built frontend files
-  fallback: "./frontend/dist/index.html"  # Fallback file for SPA routing
-
 # AgenticOS configuration
 agentic:
-  # Shell configuration
-  shell:
-    onMessage: null  # Will be set by the server
-
   # Model configuration
   model:
-    provider: "openai"  # Model provider
-    model: "gpt-4"  # Model name
-    apiKey: "${OPENAI_API_KEY}"  # API key (use environment variable)
+    providers:
+      openai:
+        endpoint: "https://api.openai.com/v1"
+        apiKey: "${OPENAI_API_KEY}"  # API key (use environment variable)
+        adapterType: "openai"
+        models:
+          - type: "llm"
+            name: "gpt-4"
+          - type: "llm"
+            name: "gpt-3.5-turbo"
+          - type: "embed"
+            name: "text-embedding-ada-002"
 
   # Task configuration
   task:

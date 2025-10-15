@@ -4,15 +4,17 @@ import { createAgenticOS, ledger, modelManager, taskManager } from '@agentic-os/
 import { v4 as uuidv4 } from 'uuid';
 import type { ShellMessage, PostRequest, PostResponse } from '@agentic-os/core';
 import type { SSEConnection, WebUIConfig, PostMessageRequest, PostMessageResponse } from './types';
+import type { AgenticConfig } from './config';
 
 export type WebUIServer = {
   start: () => Promise<void>;
   stop: () => void;
 };
 
-const createWebUIServer = (config: WebUIConfig = {}): WebUIServer => {
-  const port = config.port || parseInt(process.env.PORT || '3000', 10);
-  const corsOrigin = config.cors?.origin || '*';
+const createWebUIServer = (agenticConfig: AgenticConfig = {}): WebUIServer => {
+  const webuiConfig = agenticConfig.webui || {};
+  const port = webuiConfig.port || parseInt(process.env.PORT || '3000', 10);
+  const corsOrigin = webuiConfig.cors?.origin || '*';
   
   // Track active SSE connections
   const sseConnections = new Map<string, SSEConnection>();
@@ -26,7 +28,8 @@ const createWebUIServer = (config: WebUIConfig = {}): WebUIServer => {
         if (connection && connection.isActive) {
           try {
             const data = `data: ${JSON.stringify(message)}\n\n`;
-            connection.response.body?.write(new TextEncoder().encode(data));
+            // Note: SSE response handling needs to be implemented properly
+            // This is a placeholder for the actual SSE implementation
           } catch (error) {
             console.error('Error sending SSE message:', error);
             connection.isActive = false;
@@ -36,9 +39,9 @@ const createWebUIServer = (config: WebUIConfig = {}): WebUIServer => {
       },
     },
   })
-    .with(ledger({}))
-    .with(modelManager({}))
-    .with(taskManager({}));
+    .with(ledger())
+    .with(modelManager(agenticConfig.model || { providers: {} }))
+    .with(taskManager());
 
   const server = Bun.serve({
     port,
@@ -47,11 +50,11 @@ const createWebUIServer = (config: WebUIConfig = {}): WebUIServer => {
       const path = url.pathname;
 
       // Add CORS headers
-      const corsHeaders = {
-        'Access-Control-Allow-Origin': corsOrigin,
+      const corsHeaders: Record<string, string> = {
+        'Access-Control-Allow-Origin': Array.isArray(corsOrigin) ? corsOrigin.join(', ') : corsOrigin,
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Credentials': config.cors?.credentials ? 'true' : 'false',
+        'Access-Control-Allow-Credentials': webuiConfig.cors?.credentials ? 'true' : 'false',
       };
 
       // Handle preflight requests
@@ -90,7 +93,7 @@ const createWebUIServer = (config: WebUIConfig = {}): WebUIServer => {
 
         const postRequest: PostRequest = {
           message: body.message,
-          taskId: body.taskId,
+          ...(body.taskId && { taskId: body.taskId }),
         };
 
         const response: PostResponse = await agenticOS.post(postRequest);
@@ -181,7 +184,7 @@ const createWebUIServer = (config: WebUIConfig = {}): WebUIServer => {
     const path = url.pathname === '/' ? '/index.html' : url.pathname;
     
     try {
-      // Try to serve from frontend/dist
+      // Hard-coded static file path
       const filePath = `./frontend/dist${path}`;
       const file = Bun.file(filePath);
       

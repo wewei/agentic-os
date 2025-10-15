@@ -3,24 +3,27 @@
 // WebUI Entry Point
 
 import { createWebUIServer } from './backend/server';
-import type { WebUIConfig } from './backend/types';
+import { loadConfig } from './backend/config';
+import type { AgenticConfig } from './backend/config';
 
 const main = async (): Promise<void> => {
-  // Load configuration from environment or use defaults
-  const config: WebUIConfig = {
-    port: parseInt(process.env.PORT || '3000', 10),
-    cors: {
-      origin: process.env.CORS_ORIGIN || '*',
-      credentials: process.env.CORS_CREDENTIALS === 'true',
-    },
-    static: {
-      path: './frontend/dist',
-      fallback: './frontend/dist/index.html',
+  // Load configuration from $HOME/.agent-os/config.yaml
+  const agenticConfig = loadConfig();
+  
+  // Merge with environment variables for webui config
+  const finalConfig: AgenticConfig = {
+    ...agenticConfig,
+    webui: {
+      port: agenticConfig.webui?.port || parseInt(process.env.PORT || '3000', 10),
+      cors: {
+        origin: agenticConfig.webui?.cors?.origin || process.env.CORS_ORIGIN || '*',
+        credentials: agenticConfig.webui?.cors?.credentials || process.env.CORS_CREDENTIALS === 'true',
+      },
     },
   };
 
   // Create and start the server
-  const server = createWebUIServer(config);
+  const server = createWebUIServer(finalConfig);
   
   // Handle graceful shutdown
   const shutdown = (): void => {

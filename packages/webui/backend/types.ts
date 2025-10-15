@@ -24,10 +24,6 @@ export type WebUIConfig = {
     origin?: string | string[];
     credentials?: boolean;
   };
-  static?: {
-    path?: string;
-    fallback?: string;
-  };
 };
 
 // Re-export relevant types from core

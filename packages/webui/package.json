@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@agentic-os/core": "workspace:*",
+    "js-yaml": "^4.1.0",
     "uuid": "^11.0.3",
     "zod": "^4.1.12"
   },
@@ -46,6 +47,7 @@
     "@eslint/js": "^9.15.0",
     "@types/bun": "latest",
     "@types/eslint__js": "^8.42.3",
+    "@types/js-yaml": "^4.0.9",
     "@types/uuid": "^10.0.0",
     "eslint": "^9.15.0",
     "eslint-plugin-import": "^2.31.0",
