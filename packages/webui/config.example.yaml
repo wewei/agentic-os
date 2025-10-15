@@ -1,0 +1,36 @@
+# Agentic OS WebUI Configuration Example
+# Copy this file to config.yaml and customize as needed
+
+# Server configuration
+server:
+  port: 3000  # Port for the WebUI server
+  cors:
+    origin: "*"  # CORS origin (use "*" for development, specific domain for production)
+    credentials: false  # Allow credentials in CORS requests
+
+# Static file serving
+static:
+  path: "./frontend/dist"  # Path to built frontend files
+  fallback: "./frontend/dist/index.html"  # Fallback file for SPA routing
+
+# AgenticOS configuration
+agentic:
+  # Shell configuration
+  shell:
+    onMessage: null  # Will be set by the server
+
+  # Model configuration
+  model:
+    provider: "openai"  # Model provider
+    model: "gpt-4"  # Model name
+    apiKey: "${OPENAI_API_KEY}"  # API key (use environment variable)
+
+  # Task configuration
+  task:
+    maxConcurrentTasks: 5  # Maximum concurrent tasks
+    taskTimeout: 300000  # Task timeout in milliseconds (5 minutes)
+
+  # Ledger configuration
+  ledger:
+    persistence: true  # Enable persistence
+    maxEntries: 1000  # Maximum ledger entries to keep

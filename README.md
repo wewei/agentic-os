@@ -10,7 +10,8 @@ Agentic OS 是一个基于总线架构的 Agent 系统实现。
 agent-os/
 ├── packages/
 │   ├── core/          # @agentic-os/core - 核心系统
-│   └── cli/           # @agentic-os/cli - 终端 UI
+│   ├── cli/           # @agentic-os/cli - 终端 UI
+│   └── webui/         # @agentic-os/webui - Web 界面
 └── package.json       # 工作空间根配置
 ```
 
@@ -43,6 +44,12 @@ bun run dev
 bun run cli
 ```
 
+或启动 Web UI：
+
+```bash
+bun run webui
+```
+
 ## Packages
 
 ### [@agentic-os/core](./packages/core)
@@ -65,6 +72,18 @@ bun run cli
 - 命令系统：支持 `/help`、`/clear`、`/config` 等命令
 
 详细文档请查看 [packages/cli/README.md](./packages/cli/README.md)
+
+### [@agentic-os/webui](./packages/webui)
+
+现代化的 Web 界面，用于与 Agent 交互：
+
+- **实时消息流**：使用 Server-Sent Events (SSE) 进行实时消息推送
+- **现代 UI**：基于 React + shadcn/ui + Tailwind CSS
+- **工具调用可视化**：实时显示 Agent 的工具调用和结果
+- **响应式设计**：支持桌面和移动设备
+- **消息组装**：智能组装流式消息片段
+
+详细文档请查看 [packages/webui/README.md](./packages/webui/README.md)
 
 ## 开发
 

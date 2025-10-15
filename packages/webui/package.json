@@ -1,0 +1,73 @@
+{
+  "name": "@agentic-os/webui",
+  "version": "0.1.0",
+  "description": "Agentic OS WebUI - Web interface for interacting with agents",
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts",
+  "type": "module",
+  "bin": {
+    "agentic-webui": "./index.ts"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "types": "./index.ts"
+    }
+  },
+  "files": [
+    "frontend",
+    "backend",
+    "index.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepublishOnly": "bun run lint",
+    "dev": "bun run --watch index.ts",
+    "start": "bun run index.ts",
+    "build": "bun run --cwd frontend build",
+    "build:frontend": "bun run --cwd frontend build",
+    "dev:frontend": "bun run --cwd frontend dev",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@agentic-os/core": "workspace:*",
+    "uuid": "^11.0.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/bun": "latest",
+    "@types/eslint__js": "^8.42.3",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9.15.0",
+    "eslint-plugin-import": "^2.31.0",
+    "typescript-eslint": "^8.15.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "keywords": [
+    "agent",
+    "ai",
+    "webui",
+    "react",
+    "sse",
+    "typescript",
+    "bun"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wewei/agentic-os.git",
+    "directory": "packages/webui"
+  }
+}
