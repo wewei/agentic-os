@@ -10,6 +10,12 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      parserOptions: {
+        project: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     plugins: {
       import: importPlugin,
     },
@@ -53,6 +59,15 @@ export default tseslint.config(
       '@typescript-eslint/prefer-interface': 'off', // 我们使用 type 而非 interface
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     }
+  },
+  // Config files - disable project requirement
+  {
+    files: ['**/*.config.ts', '**/index.ts'],
+    languageOptions: {
+      parserOptions: {
+        project: false,
+      },
+    },
   },
   // React/WebUI 特定配置
   {
