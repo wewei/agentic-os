@@ -1,6 +1,7 @@
 // Task Manager types
 
 import type { Task, Message } from '../types';
+import type { LLMConfig } from './runloop';
 
 export type TaskState = {
   task: Task;
@@ -8,6 +9,7 @@ export type TaskState = {
   isRunning: boolean;
   goal: string; // Short description for routing decisions
   lastActivityTime: number;
+  currentLLMConfig: LLMConfig; // Current LLM configuration for this task
 };
 
 export type ExecutionContext = {

@@ -20,4 +20,5 @@ export const taskManager = (): Module => {
 };
 
 export type { TaskRegistry, TaskState } from './types';
+export type { LLMConfig } from './runloop';
 

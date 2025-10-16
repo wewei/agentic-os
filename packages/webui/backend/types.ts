@@ -1,10 +1,11 @@
 // Backend types for WebUI server
 
-import type { ShellMessage } from '@agentic-os/core';
+import type { LLMConfig } from '@agentic-os/core';
 
 export type PostMessageRequest = {
   message: string;
   taskId?: string;
+  llmConfig?: LLMConfig;
 };
 
 export type PostMessageResponse = {

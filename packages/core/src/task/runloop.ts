@@ -84,7 +84,7 @@ const streamContentToUser = async (
   }
 };
 
-const generateToolsFromBus = async (callId: string, bus: AgentBus, taskId: string): Promise<ToolDefinition[]> => {
+const generateToolsFromBus = async (callId: string, bus: SystemBus, taskId: string): Promise<ToolDefinition[]> => {
   // Get all modules
   const modulesResult = unwrapInvokeResult(await bus.invoke('bus:list', callId, taskId, '{}'));
   const { modules } = JSON.parse(modulesResult);
@@ -211,7 +211,7 @@ const processLLMResponse = async (
   return false; // Task complete
 };
 
-const completeTask = async (callId: string, taskId: string, taskState: TaskState, bus: AgentBus): Promise<void> => {
+const completeTask = async (callId: string, taskId: string, taskState: TaskState, bus: SystemBus): Promise<void> => {
   taskState.task.completionStatus = 'success';
   taskState.task.updatedAt = Date.now();
   unwrapInvokeResult(await bus.invoke('ldg:task:save', callId, 'system', JSON.stringify({ task: taskState.task })));
@@ -235,34 +235,12 @@ const failTask = async (
   await streamContentToUser(callId, taskId, `Error: ${errorMessage}`, bus);
 };
 
-const getDefaultLLMProvider = async (
-  callId: string,
-  bus: SystemBus,
-  taskId: string
-): Promise<{ provider: string; model: string }> => {
-  const result = unwrapInvokeResult(await bus.invoke('model:listLLM', callId, taskId, '{}'));
-  const { providers } = JSON.parse(result) as {
-    providers: Array<{ providerName: string; models: string[] }>;
-  };
 
-  if (!providers || providers.length === 0) {
-    throw new Error('No LLM providers available');
-  }
-
-  const firstProvider = providers[0];
-  if (!firstProvider || !firstProvider.models || firstProvider.models.length === 0) {
-    throw new Error('No LLM models available');
-  }
-
-  const firstModel = firstProvider.models[0];
-  if (!firstModel) {
-    throw new Error('No LLM model found');
-  }
-
-  return {
-    provider: firstProvider.providerName,
-    model: firstModel,
-  };
+export type LLMConfig = {
+  provider: string;
+  model: string;
+  topP?: number;
+  temperature?: number;
 };
 
 const runExecutionLoop = async (
@@ -270,18 +248,18 @@ const runExecutionLoop = async (
   taskId: string,
   messages: Message[],
   tools: ToolDefinition[],
+  llmConfig: LLMConfig,
   bus: SystemBus
 ): Promise<void> => {
-  // Get default LLM provider and model
-  const { provider, model } = await getDefaultLLMProvider(callId, bus, taskId);
-
   let continueLoop = true;
 
   while (continueLoop) {
     const llmInput = {
       messages: convertToLLMMessages(messages),
-      provider,
-      model,
+      provider: llmConfig.provider,
+      model: llmConfig.model,
+      topP: llmConfig.topP,
+      temperature: llmConfig.temperature,
       streamToUser: true, // Enable streaming to user
       tools,
     };
@@ -291,7 +269,7 @@ const runExecutionLoop = async (
   }
 };
 
-export const createExecuteTask = (registry: TaskRegistry, bus: AgentBus) => {
+export const createExecuteTask = (registry: TaskRegistry, bus: SystemBus) => {
   return async (taskId: string): Promise<void> => {
     const taskState = registry.get(taskId);
     if (!taskState) {
@@ -309,7 +287,8 @@ export const createExecuteTask = (registry: TaskRegistry, bus: AgentBus) => {
       const messages = taskState.messages;
       const tools = await generateToolsFromBus(callId, bus, taskId);
 
-      await runExecutionLoop(callId, taskId, messages, tools, bus);
+      // Use the LLM config from task state (which may have been updated)
+      await runExecutionLoop(callId, taskId, messages, tools, taskState.currentLLMConfig, bus);
       taskState.messages = messages;
 
       await completeTask(callId, taskId, taskState, bus);

@@ -1,5 +1,7 @@
 // Shell types
 
+import type { LLMConfig } from '../task/runloop';
+
 export type ShellMessage = {
   type: 'start' | 'content' | 'tool_call' | 'tool_result' | 'message_complete' | 'end' | 'error';
   taskId: string;
@@ -20,6 +22,7 @@ export type ShellConfig = {
 export type PostRequest = {
   message: string;
   taskId?: string;
+  llmConfig?: LLMConfig; // Required for new tasks, optional for existing tasks
 };
 
 export type PostResponse = {

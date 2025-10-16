@@ -3,13 +3,18 @@
 import { z } from 'zod';
 
 import type { SystemBus, AbilityMeta, Task, Message, AbilityResult } from '../types';
-import type { TaskRegistry } from './types';
+import type { LLMConfig } from './runloop';
+import type { TaskRegistry, TaskState } from './types';
 
 // Schema definitions
 const TASK_SPAWN_INPUT_SCHEMA = z.object({
   goal: z.string().describe('Task goal or initial message'),
   parentTaskId: z.string().optional().describe('Optional parent task ID for subtasks'),
   systemPrompt: z.string().optional().describe('Optional custom system prompt'),
+  provider: z.string().describe('LLM provider name'),
+  model: z.string().describe('LLM model name'),
+  topP: z.number().optional().describe('Optional top-p parameter for LLM'),
+  temperature: z.number().optional().describe('Optional temperature parameter for LLM'),
 });
 
 const TASK_SPAWN_OUTPUT_SCHEMA = z.object({
@@ -19,6 +24,10 @@ const TASK_SPAWN_OUTPUT_SCHEMA = z.object({
 const TASK_SEND_INPUT_SCHEMA = z.object({
   receiverId: z.string().describe('Task ID to receive the message'),
   message: z.string().describe('Message content to send'),
+  provider: z.string().optional().describe('Optional LLM provider name for task execution'),
+  model: z.string().optional().describe('Optional LLM model name for task execution'),
+  topP: z.number().optional().describe('Optional top-p parameter for LLM'),
+  temperature: z.number().optional().describe('Optional temperature parameter for LLM'),
 });
 
 const TASK_SEND_OUTPUT_SCHEMA = z.object({
@@ -177,12 +186,20 @@ const registerSpawnAbility = (
 
     await saveTaskAndMessages(bus, callId, task, messages);
 
+    const llmConfig: LLMConfig = {
+      provider: input.provider,
+      model: input.model,
+      topP: input.topP,
+      temperature: input.temperature,
+    };
+
     registry.set(taskId, {
       task,
       messages,
       isRunning: false,
       goal: input.goal,
       lastActivityTime: Date.now(),
+      currentLLMConfig: llmConfig,
     });
 
     executeTask(taskId).catch((error) => {
@@ -191,6 +208,25 @@ const registerSpawnAbility = (
 
     return { type: 'success', result: { taskId } };
   });
+};
+
+const createUserMessage = (taskId: string, message: string): Message => ({
+  id: `msg-${Date.now()}-usr`,
+  taskId,
+  role: 'user',
+  content: message,
+  timestamp: Date.now(),
+});
+
+const updateTaskLLMConfig = (taskState: TaskState, input: TaskSendInput): void => {
+  if (input.provider && input.model) {
+    taskState.currentLLMConfig = {
+      provider: input.provider,
+      model: input.model,
+      topP: input.topP,
+      temperature: input.temperature,
+    };
+  }
 };
 
 const registerSendAbility = (
@@ -203,35 +239,23 @@ const registerSendAbility = (
     if (!taskState) {
       return {
         type: 'success' as const,
-        result: {
-          success: false,
-          error: `Task not found: ${input.receiverId}`,
-        }
+        result: { success: false, error: `Task not found: ${input.receiverId}` }
       };
     }
 
     if (taskState.task.completionStatus !== undefined) {
       return {
         type: 'success' as const,
-        result: {
-          success: false,
-          error: `Task ${input.receiverId} is already completed`,
-        }
+        result: { success: false, error: `Task ${input.receiverId} is already completed` }
       };
     }
 
-    const userMessage: Message = {
-      id: `msg-${Date.now()}-usr`,
-      taskId: input.receiverId,
-      role: 'user',
-      content: input.message,
-      timestamp: Date.now(),
-    };
-
+    const userMessage = createUserMessage(input.receiverId, input.message);
     unwrapInvokeResult(await bus.invoke('ldg:msg:save', callId, 'system', JSON.stringify({ message: userMessage })));
 
     taskState.messages.push(userMessage);
     taskState.lastActivityTime = Date.now();
+    updateTaskLLMConfig(taskState, input);
 
     if (!taskState.isRunning) {
       executeTask(input.receiverId).catch((error) => {
@@ -243,8 +267,8 @@ const registerSendAbility = (
   });
 };
 
-const registerCancelAbility = (registry: TaskRegistry, bus: AgentBus): void => {
-  bus.register('task:cancel', TASK_CANCEL_META, async (callId, _taskId, input: TaskCancelInput) => {
+const registerCancelAbility = (registry: TaskRegistry, bus: SystemBus): void => {
+  bus.register('task:cancel', TASK_CANCEL_META, async (callId: string, _taskId: string, input: TaskCancelInput) => {
     const taskState = registry.get(input.taskId);
     if (!taskState) {
       return {
@@ -264,8 +288,8 @@ const registerCancelAbility = (registry: TaskRegistry, bus: AgentBus): void => {
   });
 };
 
-const registerActiveAbility = (registry: TaskRegistry, bus: AgentBus): void => {
-  bus.register('task:active', TASK_ACTIVE_META, async (_callId, _taskId, input: TaskActiveInput) => {
+const registerActiveAbility = (registry: TaskRegistry, bus: SystemBus): void => {
+  bus.register('task:active', TASK_ACTIVE_META, async (_callId: string, _taskId: string, input: TaskActiveInput) => {
     const activeTasks = Array.from(registry.values())
       .filter((state) => state.task.completionStatus === undefined)
       .slice(0, input.limit || 100)

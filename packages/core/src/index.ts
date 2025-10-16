@@ -50,6 +50,7 @@ export type { Ledger, LedgerConfig } from './ledger';
 export type { ModelManagerConfig } from './model';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';
 export type { ShellMessage, ShellConfig, PostRequest, PostResponse } from './shell/types';
+export type { LLMConfig } from './task';
 
 // Export module factories
 export { ledger } from './ledger';

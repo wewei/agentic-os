@@ -94,6 +94,7 @@ const createWebUIServer = (agenticConfig: AgenticConfig = {}): WebUIServer => {
         const postRequest: PostRequest = {
           message: body.message,
           ...(body.taskId && { taskId: body.taskId }),
+          ...(body.llmConfig && { llmConfig: body.llmConfig }),
         };
 
         const response: PostResponse = await agenticOS.post(postRequest);
