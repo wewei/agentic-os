@@ -10,6 +10,64 @@ export type LightServer = {
   stop: () => void;
 };
 
+type ValidationResult = 
+  | { valid: true }
+  | { valid: false; error: string };
+
+const validatePostMessageRequest = (body: PostMessageRequest): ValidationResult => {
+  // Validate message
+  if (!body.message || typeof body.message !== 'string') {
+    return { valid: false, error: 'Message is required and must be a string' };
+  }
+  if (body.message.trim() === '') {
+    return { valid: false, error: 'Message cannot be empty' };
+  }
+
+  // Validate taskId if provided
+  if (body.taskId !== undefined && typeof body.taskId !== 'string') {
+    return { valid: false, error: 'taskId must be a string' };
+  }
+
+  // For new tasks (no taskId), llmConfig is required
+  if (!body.taskId) {
+    if (!body.llmConfig) {
+      return { valid: false, error: 'llmConfig is required for new tasks' };
+    }
+    if (!body.llmConfig.provider || typeof body.llmConfig.provider !== 'string' || body.llmConfig.provider.trim() === '') {
+      return { valid: false, error: 'llmConfig.provider is required and must be a non-empty string for new tasks' };
+    }
+    if (!body.llmConfig.model || typeof body.llmConfig.model !== 'string' || body.llmConfig.model.trim() === '') {
+      return { valid: false, error: 'llmConfig.model is required and must be a non-empty string for new tasks' };
+    }
+  }
+
+  // Validate llmConfig fields if provided
+  if (body.llmConfig) {
+    if (body.llmConfig.provider !== undefined) {
+      if (typeof body.llmConfig.provider !== 'string' || body.llmConfig.provider.trim() === '') {
+        return { valid: false, error: 'llmConfig.provider must be a non-empty string' };
+      }
+    }
+    if (body.llmConfig.model !== undefined) {
+      if (typeof body.llmConfig.model !== 'string' || body.llmConfig.model.trim() === '') {
+        return { valid: false, error: 'llmConfig.model must be a non-empty string' };
+      }
+    }
+    if (body.llmConfig.topP !== undefined) {
+      if (typeof body.llmConfig.topP !== 'number' || body.llmConfig.topP < 0 || body.llmConfig.topP > 1) {
+        return { valid: false, error: 'llmConfig.topP must be a number between 0 and 1' };
+      }
+    }
+    if (body.llmConfig.temperature !== undefined) {
+      if (typeof body.llmConfig.temperature !== 'number' || body.llmConfig.temperature < 0 || body.llmConfig.temperature > 2) {
+        return { valid: false, error: 'llmConfig.temperature must be a number between 0 and 2' };
+      }
+    }
+  }
+
+  return { valid: true };
+};
+
 const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
   const endpointConfig = agenticConfig.endpoint || {};
   const host = endpointConfig.host || 'localhost';
@@ -104,9 +162,11 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
       if (path === `${apiPrefix}/send` && request.method === 'POST') {
         const body = await request.json() as PostMessageRequest;
         
-        if (!body.message || typeof body.message !== 'string') {
+        // Validate request before processing
+        const validation = validatePostMessageRequest(body);
+        if (!validation.valid) {
           return new Response(
-            JSON.stringify({ error: 'Message is required and must be a string' }),
+            JSON.stringify({ error: validation.error }),
             { 
               status: 400, 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -216,8 +276,11 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
 
     } catch (error) {
       console.error('API request error:', error);
+      
+      // Return 500 Internal Server Error for unexpected errors
+      const errorMessage = error instanceof Error ? error.message : 'Internal server error';
       return new Response(
-        JSON.stringify({ error: 'Internal server error' }),
+        JSON.stringify({ error: errorMessage }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

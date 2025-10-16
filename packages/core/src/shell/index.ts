@@ -12,6 +12,14 @@ type ShellModule = Module & {
   post: (request: PostRequest) => Promise<PostResponse>;
 };
 
+// Custom error for validation failures
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
 const generateCallId = (): string => {
   return uuidv4().replace(/-/g, '');
 };
@@ -26,38 +34,38 @@ const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
 
 const validatePostRequest = (request: PostRequest): void => {
   if (typeof request.message !== 'string' || request.message.trim() === '') {
-    throw new Error('Invalid message: must be non-empty string');
+    throw new ValidationError('Invalid message: must be non-empty string');
   }
   if (request.taskId !== undefined && typeof request.taskId !== 'string') {
-    throw new Error('Invalid taskId: must be string');
+    throw new ValidationError('Invalid taskId: must be string');
   }
   
   // For new tasks (no taskId), llmConfig is required
   if (!request.taskId) {
     if (!request.llmConfig) {
-      throw new Error('llmConfig is required for new tasks');
+      throw new ValidationError('llmConfig is required for new tasks');
     }
     if (typeof request.llmConfig.provider !== 'string' || request.llmConfig.provider.trim() === '') {
-      throw new Error('Invalid provider: must be non-empty string for new tasks');
+      throw new ValidationError('Invalid provider: must be non-empty string for new tasks');
     }
     if (typeof request.llmConfig.model !== 'string' || request.llmConfig.model.trim() === '') {
-      throw new Error('Invalid model: must be non-empty string for new tasks');
+      throw new ValidationError('Invalid model: must be non-empty string for new tasks');
     }
   }
   
   // For existing tasks, if llmConfig is provided, validate it
   if (request.llmConfig) {
     if (request.llmConfig.provider !== undefined && (typeof request.llmConfig.provider !== 'string' || request.llmConfig.provider.trim() === '')) {
-      throw new Error('Invalid provider: must be non-empty string');
+      throw new ValidationError('Invalid provider: must be non-empty string');
     }
     if (request.llmConfig.model !== undefined && (typeof request.llmConfig.model !== 'string' || request.llmConfig.model.trim() === '')) {
-      throw new Error('Invalid model: must be non-empty string');
+      throw new ValidationError('Invalid model: must be non-empty string');
     }
     if (request.llmConfig.topP !== undefined && (typeof request.llmConfig.topP !== 'number' || request.llmConfig.topP < 0 || request.llmConfig.topP > 1)) {
-      throw new Error('Invalid topP: must be number between 0 and 1');
+      throw new ValidationError('Invalid topP: must be number between 0 and 1');
     }
     if (request.llmConfig.temperature !== undefined && (typeof request.llmConfig.temperature !== 'number' || request.llmConfig.temperature < 0 || request.llmConfig.temperature > 2)) {
-      throw new Error('Invalid temperature: must be number between 0 and 2');
+      throw new ValidationError('Invalid temperature: must be number between 0 and 2');
     }
   }
 };
@@ -150,7 +158,7 @@ export const shell = (config: ShellConfig): ShellModule => {
       } else {
         // For new tasks, LLM config is required (validated above)
         if (!llmConfig) {
-          throw new Error('llmConfig is required for new tasks');
+          throw new ValidationError('llmConfig is required for new tasks');
         }
         targetTaskId = await createNewTask(callId, bus, message, llmConfig);
       }
