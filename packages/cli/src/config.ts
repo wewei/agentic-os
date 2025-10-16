@@ -1,10 +1,10 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
 import yaml from 'js-yaml';
 
-import type { AppConfig } from './types.ts';
+import type { CLIConfig } from './types.ts';
 
 /**
  * Get the default configuration directory path
@@ -21,105 +21,46 @@ export const getConfigPath = (): string => {
 };
 
 /**
- * Ensure the configuration directory exists
- */
-export const ensureConfigDir = (): void => {
-  const configDir = getConfigDir();
-  if (!existsSync(configDir)) {
-    mkdirSync(configDir, { recursive: true });
-  }
-};
-
-/**
  * Get default configuration
  */
-export const getDefaultConfig = (): AppConfig => ({
-  cli: {
-    theme: 'default',
-    messageLimit: 1000,
-    layout: {
-      messageBoxRatio: 0.8,
-      minMessageBoxHeight: 6,
-      minInputBoxHeight: 3,
-      minScreenWidth: 20,
-      minScreenHeight: 10,
-    },
-  },
+export const getDefaultConfig = (): CLIConfig => ({
   model: {
-    provider: 'openai',
-    model: 'gpt-4',
-  },
-  shell: {
-    maxBufferSize: 1024 * 1024,
+    providers: {
+      'openai-main': {
+        endpoint: 'https://api.openai.com/v1',
+        apiKey: process.env.OPENAI_API_KEY || '',
+        adapterType: 'openai',
+        models: [
+          { type: 'llm', name: 'gpt-4-turbo-preview' },
+          { type: 'llm', name: 'gpt-3.5-turbo' },
+        ],
+      },
+    },
   },
 });
 
 /**
  * Load configuration from YAML file
  */
-export const loadConfig = (configPath?: string): AppConfig => {
+export const loadConfig = (configPath?: string): CLIConfig => {
   const path = configPath || getConfigPath();
 
   if (!existsSync(path)) {
+    console.warn(`Config file not found at ${path}, using defaults`);
     return getDefaultConfig();
   }
 
   try {
     const content = readFileSync(path, 'utf-8');
-    const config = yaml.load(content) as AppConfig;
-    return { ...getDefaultConfig(), ...config };
+    const config = yaml.load(content) as Partial<CLIConfig>;
+    
+    // Merge with defaults
+    const defaultConfig = getDefaultConfig();
+    return {
+      model: { ...defaultConfig.model, ...config.model },
+    };
   } catch (error) {
     console.error(`Failed to load config from ${path}:`, error);
     return getDefaultConfig();
   }
-};
-
-/**
- * Save configuration to YAML file
- */
-export const saveConfig = (
-  config: AppConfig,
-  configPath?: string
-): void => {
-  const path = configPath || getConfigPath();
-
-  try {
-    ensureConfigDir();
-    const content = yaml.dump(config, {
-      indent: 2,
-      lineWidth: 80,
-      noRefs: true,
-    });
-    writeFileSync(path, content, 'utf-8');
-  } catch (error) {
-    console.error(`Failed to save config to ${path}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Get configuration value for a specific module
- */
-export const getModuleConfig = <T = Record<string, unknown>>(
-  config: AppConfig,
-  module: string
-): T | undefined => {
-  return config[module] as T | undefined;
-};
-
-/**
- * Update configuration for a specific module
- */
-export const updateModuleConfig = (
-  config: AppConfig,
-  module: string,
-  moduleConfig: Record<string, unknown>
-): AppConfig => {
-  return {
-    ...config,
-    [module]: {
-      ...config[module],
-      ...moduleConfig,
-    },
-  };
 };

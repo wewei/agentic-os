@@ -1,115 +1,235 @@
 # @agentic-os/cli
 
-Terminal User Interface (TUI) for Agentic OS - An interactive CLI for agent interaction.
+Simple pipe mode CLI for testing Agentic OS locally.
 
 ## Features
 
-- 🖥️ **Split-window TUI**: Upper window for message stream, lower window for input
-- ⚙️ **Configurable**: All settings stored in `~/.agentic-os/config.yaml`
-- 🎨 **Rich Display**: Color-coded messages by type (user, agent, system, error)
-- 📜 **Message History**: Scrollable message history with customizable limits
-- ⌨️ **Keyboard Shortcuts**: Intuitive navigation and control
+- 🚀 Creates a local Agentic OS instance
+- 📝 Pipe mode for stdin/stdout interaction
+- ⚙️ Configurable via YAML
+- 🧠 Full agent capabilities (LLM, tasks, memory, ledger)
 
 ## Installation
 
 ```bash
-bun install @agentic-os/cli
-```
-
-## Usage
-
-### Start the CLI
-
-```bash
-# Using the global command
-agentic
-
-# Or with custom config path
-agentic --config /path/to/config.yaml
-```
-
-### Development
-
-```bash
-# Run in development mode with hot reload
-bun run dev
-
-# Start normally
-bun run start
-
-# Run linter
-bun run lint
-
-# Fix linter issues
-bun run lint:fix
+bun install
 ```
 
 ## Configuration
 
-Configuration is stored in `~/.agentic-os/config.yaml` and organized by module:
+Create a configuration file at `~/.agentic-os/config.yaml`:
 
 ```yaml
-cli:
-  theme: default
-  messageLimit: 1000
-
 model:
-  provider: openai
-  model: gpt-4
+  providers:
+    openai-main:
+      endpoint: https://api.openai.com/v1
+      apiKey: ${OPENAI_API_KEY}  # or set directly
+      adapterType: openai
+      models:
+        - type: llm
+          name: gpt-4-turbo-preview
+        - type: llm
+          name: gpt-3.5-turbo
 
 shell:
   maxBufferSize: 1048576
 ```
 
-### Configuration Structure
+Or use the example config:
 
-Each module can have its own configuration section. The CLI reads this file on startup and merges it with default values.
+```bash
+mkdir -p ~/.agentic-os
+cp config.example.yaml ~/.agentic-os/config.yaml
+# Edit the file to add your API key
+```
 
-## Commands
+## Usage
 
-- `/help` - Show available commands
-- `/clear` - Clear message history
-- `/config` - Display current configuration
-- `Ctrl+C` or `Esc` - Exit application
+### Basic Usage
+
+```bash
+# Start the CLI (uses ~/.agentic-os/config.yaml)
+agentic
+
+# With custom config
+agentic --config /path/to/config.yaml
+```
+
+### Pipe Mode
+
+The CLI operates in pipe mode, reading from stdin:
+
+```bash
+# Single message
+echo "What is 2+2?" | agentic
+
+# Multiple messages
+cat messages.txt | agentic
+
+# Interactive mode
+agentic
+# Type your messages, press Enter after each
+# Press Ctrl+D to exit
+```
+
+### Examples
+
+#### 1. Simple Question
+
+```bash
+echo "Hello, what can you do?" | agentic
+```
+
+#### 2. Multiple Messages
+
+```bash
+cat <<EOF | agentic
+What is the capital of France?
+Calculate 15 * 23
+Tell me a joke
+EOF
+```
+
+#### 3. From File
+
+```bash
+# Create messages file
+cat > messages.txt <<EOF
+Analyze this data
+Process the results
+Generate a summary
+EOF
+
+# Send messages
+cat messages.txt | agentic
+```
+
+#### 4. Interactive Session
+
+```bash
+agentic
+# Type your messages:
+> Create a new task to analyze data
+< [Task abc123] Status: created
+< Agent response...
+
+> Check the status
+< [Task abc123] Status: active
+< Processing...
+```
+
+## Output Format
+
+- **stdout**: Agent responses and task updates
+- **stderr**: System messages, errors, and initialization info
+
+```bash
+# Separate output and errors
+agentic > responses.txt 2> errors.log
+
+# Only see agent responses
+agentic 2>/dev/null
+```
+
+## Environment Variables
+
+You can use environment variables in your config:
+
+```bash
+export OPENAI_API_KEY=sk-...
+agentic
+```
+
+Or set a default config path:
+
+```bash
+export AGENTIC_CONFIG=/path/to/config.yaml
+agentic --config $AGENTIC_CONFIG
+```
 
 ## Architecture
 
-The CLI is built with a functional programming approach:
+The CLI creates a local Agentic OS instance with:
 
-- **types.ts**: Type definitions
-- **config.ts**: Configuration loading and management
-- **ui.ts**: Blessed UI component creation and management
-- **app.ts**: Application state and business logic
-- **cli.ts**: CLI entry point
+- **System Bus**: Message routing and ability invocation
+- **Shell**: Request handling and message dispatch
+- **Model Manager**: LLM provider integration
+- **Task Manager**: Task lifecycle and execution
+- **Ledger**: Token usage tracking
 
-All functions are pure and composable, following functional programming principles with no classes or interfaces.
+## Development
 
-## UI Layout
+```bash
+# Run in development mode (with watch)
+bun run dev
 
+# Run directly
+bun run start
+
+# With custom config
+bun run start -- --config ./my-config.yaml
+
+# Lint
+bun run lint
+
+# Fix linting issues
+bun run lint:fix
 ```
-┌─────────────────────────────────────┐
-│                                     │
-│  Message Stream (80% height)       │
-│  - Scrollable history               │
-│  - Color-coded by type              │
-│  - Timestamps                       │
-│                                     │
-├─────────────────────────────────────┤
-│                                     │
-│  Input Box (20% height)             │
-│  - Type and press Enter             │
-│                                     │
-└─────────────────────────────────────┘
+
+## Testing
+
+You can test the CLI without an LLM by modifying the config to use a mock provider or by checking the initialization:
+
+```bash
+# Check if CLI starts correctly
+echo "test" | bun run src/cli.ts 2>&1 | head
 ```
 
-## Message Types
+## Troubleshooting
 
-- **user**: Messages from the user (green)
-- **agent**: Responses from agents (cyan)
-- **system**: System messages (yellow)
-- **error**: Error messages (red)
+### Config not found
+
+If you see "Config file not found", create the config file:
+
+```bash
+mkdir -p ~/.agentic-os
+cp config.example.yaml ~/.agentic-os/config.yaml
+```
+
+### API Key not set
+
+Make sure your API key is set either in:
+- The config file: `apiKey: sk-...`
+- Environment variable: `export OPENAI_API_KEY=sk-...`
+
+### No response
+
+Check stderr for error messages:
+
+```bash
+echo "test" | agentic 2>&1
+```
+
+## API
+
+The package exports utilities for programmatic use:
+
+```typescript
+import {
+  runPipeMode,
+  createAgenticOSInstance,
+  processMessage,
+  loadConfig,
+} from '@agentic-os/cli';
+
+// Create an instance
+const agenticOS = createAgenticOSInstance();
+
+// Process a message
+await processMessage(agenticOS, 'Hello!');
+```
 
 ## License
 
 MIT
-

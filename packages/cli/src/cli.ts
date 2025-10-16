@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { runApp } from './app.ts';
+import { runPipeMode } from './app.ts';
 
 /**
  * Main CLI entry point
@@ -9,19 +9,16 @@ const main = async (): Promise<void> => {
   try {
     // Parse command line arguments
     const args = process.argv.slice(2);
-    
-    // Check for force pipe mode flag
-    const forcePipeMode = args.includes('-');
-    
-    // Remove the force pipe mode flag from args for config parsing
-    const filteredArgs = args.filter(arg => arg !== '-');
-    
-    const configPathIndex = filteredArgs.indexOf('--config');
-    const configPath =
-      configPathIndex >= 0 ? filteredArgs[configPathIndex + 1] : undefined;
+    let configPath: string | undefined;
 
-    // Run the application
-    await runApp(configPath, forcePipeMode);
+    // Check for --config flag
+    const configIndex = args.indexOf('--config');
+    if (configIndex >= 0 && configIndex + 1 < args.length) {
+      configPath = args[configIndex + 1];
+    }
+
+    // Run the application in pipe mode
+    await runPipeMode(configPath);
   } catch (error) {
     console.error('Failed to start Agentic OS CLI:', error);
     process.exit(1);
@@ -29,4 +26,3 @@ const main = async (): Promise<void> => {
 };
 
 main();
-

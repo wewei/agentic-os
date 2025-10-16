@@ -1,45 +1,28 @@
-# Agentic OS Configuration Example
+# Agentic OS CLI Configuration Example
 # Copy this file to ~/.agentic-os/config.yaml and customize as needed
 
-cli:
-  # UI theme (currently only 'default' is supported)
-  theme: default
-  # Maximum number of messages to keep in history
-  messageLimit: 1000
-  # Layout configuration for responsive TUI
-  layout:
-    # Ratio of screen height for message box (0.0 to 1.0)
-    messageBoxRatio: 0.8
-    # Minimum height for message box (in lines)
-    minMessageBoxHeight: 6
-    # Minimum height for input box (in lines)
-    minInputBoxHeight: 3
-    # Minimum screen width (in characters)
-    minScreenWidth: 20
-    # Minimum screen height (in lines)
-    minScreenHeight: 10
-
 model:
-  # LLM provider (e.g., 'openai', 'anthropic')
-  provider: openai
-  # Model name
-  model: gpt-4
-  # API key (or use environment variable)
-  # apiKey: your-api-key-here
+  # Model providers configuration
+  providers:
+    # OpenAI provider
+    openai-main:
+      endpoint: https://api.openai.com/v1
+      # You can set API key here or use environment variable OPENAI_API_KEY
+      apiKey: ${OPENAI_API_KEY}
+      adapterType: openai
+      models:
+        - type: llm
+          name: gpt-4-turbo-preview
+        - type: llm
+          name: gpt-3.5-turbo
+        - type: embed
+          name: text-embedding-3-small
 
-shell:
-  # Maximum buffer size for shell output (in bytes)
-  maxBufferSize: 1048576
-
-task:
-  # Maximum number of concurrent tasks
-  maxConcurrentTasks: 5
-
-memory:
-  # Memory persistence settings
-  persistPath: ~/.agentic-os/memory
-
-ledger:
-  # Token usage tracking
-  trackUsage: true
-
+    # Example: Add more providers if needed
+    # anthropic-main:
+    #   endpoint: https://api.anthropic.com/v1
+    #   apiKey: ${ANTHROPIC_API_KEY}
+    #   adapterType: anthropic
+    #   models:
+    #     - type: llm
+    #       name: claude-3-opus-20240229
