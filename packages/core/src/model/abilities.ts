@@ -179,10 +179,10 @@ const handleLLMInvoke = async (
   const { config, adapter } = validation;
 
   const options: CompletionOptions = {
-    tools: input.tools,
-    temperature: input.temperature,
-    maxTokens: input.maxTokens,
-    topP: input.topP,
+    ...(input.tools && { tools: input.tools }),
+    ...(input.temperature !== undefined && { temperature: input.temperature }),
+    ...(input.maxTokens !== undefined && { maxTokens: input.maxTokens }),
+    ...(input.topP !== undefined && { topP: input.topP }),
   };
 
   if (input.streamToUser) {
@@ -225,7 +225,7 @@ const handleListLLMInvoke = async (
   };
 };
 
-const registerListLLMAbility = (registry: ProviderRegistry, bus: AgentBus): void => {
+const registerListLLMAbility = (registry: ProviderRegistry, bus: SystemBus): void => {
   bus.register('model:listLLM', MODEL_LIST_LLM_META, async (callId, taskId, input) =>
     handleListLLMInvoke(callId, taskId, input, registry)
   );
@@ -252,7 +252,7 @@ const handleListEmbedInvoke = async (
   };
 };
 
-const registerListEmbedAbility = (registry: ProviderRegistry, bus: AgentBus): void => {
+const registerListEmbedAbility = (registry: ProviderRegistry, bus: SystemBus): void => {
   bus.register('model:listEmbed', MODEL_LIST_EMBED_META, async (callId, taskId, input) =>
     handleListEmbedInvoke(callId, taskId, input, registry)
   );

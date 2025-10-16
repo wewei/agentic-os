@@ -73,10 +73,10 @@ const streamOpenAICompletion = async (
   return await client.chat.completions.create({
     model,
     messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-    tools: options.tools as OpenAI.Chat.ChatCompletionTool[],
-    temperature: options.temperature,
-    max_tokens: options.maxTokens,
-    top_p: options.topP,
+    ...(options.tools && { tools: options.tools as OpenAI.Chat.ChatCompletionTool[] }),
+    ...(options.temperature !== undefined && { temperature: options.temperature }),
+    ...(options.maxTokens !== undefined && { max_tokens: options.maxTokens }),
+    ...(options.topP !== undefined && { top_p: options.topP }),
     stream: true,
   });
 };
@@ -90,10 +90,10 @@ const nonStreamOpenAICompletion = async (
   return await client.chat.completions.create({
     model,
     messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-    tools: options.tools as OpenAI.Chat.ChatCompletionTool[],
-    temperature: options.temperature,
-    max_tokens: options.maxTokens,
-    top_p: options.topP,
+    ...(options.tools && { tools: options.tools as OpenAI.Chat.ChatCompletionTool[] }),
+    ...(options.temperature !== undefined && { temperature: options.temperature }),
+    ...(options.maxTokens !== undefined && { max_tokens: options.maxTokens }),
+    ...(options.topP !== undefined && { top_p: options.topP }),
     stream: false,
   });
 };
@@ -124,15 +124,15 @@ const processStreamChunk = (
       updatedToolCalls,
       completionChunk: {
         content: '',
-        toolCalls: updatedToolCalls.length > 0 ? updatedToolCalls : undefined,
+        ...(updatedToolCalls.length > 0 && { toolCalls: updatedToolCalls }),
         finished: true,
-        usage: chunk.usage
-          ? {
-              promptTokens: chunk.usage.prompt_tokens,
-              completionTokens: chunk.usage.completion_tokens,
-              totalTokens: chunk.usage.total_tokens,
-            }
-          : undefined,
+        ...(chunk.usage && {
+          usage: {
+            promptTokens: chunk.usage.prompt_tokens,
+            completionTokens: chunk.usage.completion_tokens,
+            totalTokens: chunk.usage.total_tokens,
+          },
+        }),
       },
     };
   }
@@ -195,14 +195,14 @@ const completeNonStreamImpl = async (
 
   return {
     content: choice.message.content || '',
-    toolCalls,
-    usage: response.usage
-      ? {
-          promptTokens: response.usage.prompt_tokens,
-          completionTokens: response.usage.completion_tokens,
-          totalTokens: response.usage.total_tokens,
-        }
-      : undefined,
+    ...(toolCalls && { toolCalls }),
+    ...(response.usage && {
+      usage: {
+        promptTokens: response.usage.prompt_tokens,
+        completionTokens: response.usage.completion_tokens,
+        totalTokens: response.usage.total_tokens,
+      },
+    }),
   };
 };
 

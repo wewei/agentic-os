@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import type { AssembledMessage } from '@/lib/messageService';
+import { cn } from '@/lib/utils';
 
 type MessageListProps = {
   messages: AssembledMessage[];
@@ -52,14 +53,16 @@ const MessageList: React.FC<MessageListProps> = ({ messages, className }) => {
             <div className="font-medium text-blue-600">
               🔧 {toolCall.tool}
             </div>
-            {toolCall.args && (
+            {toolCall.args !== undefined && (
               <div className="mt-1 text-muted-foreground">
-                <strong>Args:</strong> {JSON.stringify(toolCall.args, null, 2)}
+                <strong>Args:</strong>
+                <pre className="inline">{JSON.stringify(toolCall.args, null, 2)}</pre>
               </div>
             )}
-            {toolCall.result && (
+            {toolCall.result !== undefined && (
               <div className="mt-1 text-green-600">
-                <strong>Result:</strong> {JSON.stringify(toolCall.result, null, 2)}
+                <strong>Result:</strong>
+                <pre className="inline">{JSON.stringify(toolCall.result, null, 2)}</pre>
               </div>
             )}
           </div>

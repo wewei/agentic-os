@@ -1,10 +1,10 @@
 // WebUI Backend Server
 
 import { createAgenticOS, ledger, modelManager, taskManager } from '@agentic-os/core';
-import { v4 as uuidv4 } from 'uuid';
 import type { ShellMessage, PostRequest, PostResponse } from '@agentic-os/core';
-import type { SSEConnection, WebUIConfig, PostMessageRequest, PostMessageResponse } from './types';
+
 import type { AgenticConfig } from './config';
+import type { SSEConnection, PostMessageRequest } from './types';
 
 export type WebUIServer = {
   start: () => Promise<void>;
@@ -27,9 +27,9 @@ const createWebUIServer = (agenticConfig: AgenticConfig = {}): WebUIServer => {
         const connection = sseConnections.get(message.taskId);
         if (connection && connection.isActive) {
           try {
-            const data = `data: ${JSON.stringify(message)}\n\n`;
             // Note: SSE response handling needs to be implemented properly
             // This is a placeholder for the actual SSE implementation
+            // const data = `data: ${JSON.stringify(message)}\n\n`;
           } catch (error) {
             console.error('Error sending SSE message:', error);
             connection.isActive = false;

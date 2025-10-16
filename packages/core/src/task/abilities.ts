@@ -117,8 +117,7 @@ const createTask = (
 
   return {
     id: taskId,
-    parentTaskId,
-    completionStatus: undefined,
+    ...(parentTaskId && { parentTaskId }),
     systemPrompt: systemPrompt || defaultSystemPrompt,
     createdAt: now,
     updatedAt: now,
@@ -189,8 +188,8 @@ const registerSpawnAbility = (
     const llmConfig: LLMConfig = {
       provider: input.provider,
       model: input.model,
-      topP: input.topP,
-      temperature: input.temperature,
+      ...(input.topP !== undefined && { topP: input.topP }),
+      ...(input.temperature !== undefined && { temperature: input.temperature }),
     };
 
     registry.set(taskId, {
@@ -223,8 +222,8 @@ const updateTaskLLMConfig = (taskState: TaskState, input: TaskSendInput): void =
     taskState.currentLLMConfig = {
       provider: input.provider,
       model: input.model,
-      topP: input.topP,
-      temperature: input.temperature,
+      ...(input.topP !== undefined && { topP: input.topP }),
+      ...(input.temperature !== undefined && { temperature: input.temperature }),
     };
   }
 };

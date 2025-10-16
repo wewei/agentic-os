@@ -1,7 +1,9 @@
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import { Send, Loader2 } from 'lucide-react';
+import type { KeyboardEvent } from 'react';
+import React, { useState, useRef } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type MessageInputProps = {

@@ -162,7 +162,15 @@ const registerTaskGetAbility = (ledger: Ledger, bus: SystemBus): void => {
 
 const registerTaskQueryAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:task:query', LEDGER_TASK_QUERY_META, async (_callId, _taskId, input: LedgerTaskQueryInput) => {
-    const result = await ledger.queryTasks(input);
+    const options = {
+      ...(input.completionStatus !== undefined && { completionStatus: input.completionStatus }),
+      ...(input.parentTaskId !== undefined && { parentTaskId: input.parentTaskId }),
+      ...(input.fromTime !== undefined && { fromTime: input.fromTime }),
+      ...(input.toTime !== undefined && { toTime: input.toTime }),
+      ...(input.limit !== undefined && { limit: input.limit }),
+      ...(input.offset !== undefined && { offset: input.offset }),
+    };
+    const result = await ledger.queryTasks(options);
     return { type: 'success', result };
   });
 };
@@ -192,7 +200,12 @@ const registerMsgSaveAbility = (ledger: Ledger, bus: SystemBus): void => {
 
 const registerMsgListAbility = (ledger: Ledger, bus: SystemBus): void => {
   bus.register('ldg:msg:list', LEDGER_MSG_LIST_META, async (_callId, _taskId, input: LedgerMsgListInput) => {
-    const result = await ledger.listMessages(input);
+    const options = {
+      taskId: input.taskId,
+      ...(input.limit !== undefined && { limit: input.limit }),
+      ...(input.offset !== undefined && { offset: input.offset }),
+    };
+    const result = await ledger.listMessages(options);
     return { type: 'success', result };
   });
 };

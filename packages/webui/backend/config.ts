@@ -1,10 +1,11 @@
 // Configuration loader for WebUI
 
 import { readFileSync } from 'fs';
-import { join } from 'path';
 import { homedir } from 'os';
-import yaml from 'js-yaml';
+import { join } from 'path';
+
 import type { ModelManagerConfig } from '@agentic-os/core';
+import yaml from 'js-yaml';
 
 export type WebUIConfig = {
   port?: number;

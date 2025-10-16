@@ -2,9 +2,9 @@
 
 // WebUI Entry Point
 
-import { createWebUIServer } from './backend/server';
-import { loadConfig } from './backend/config';
 import type { AgenticConfig } from './backend/config';
+import { loadConfig } from './backend/config';
+import { createWebUIServer } from './backend/server';
 
 const main = async (): Promise<void> => {
   // Load configuration from $HOME/.agent-os/config.yaml

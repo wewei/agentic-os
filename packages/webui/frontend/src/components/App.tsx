@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import MessageList from './MessageList';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+
 import MessageInput from './MessageInput';
+import MessageList from './MessageList';
+
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { sendMessage, connectMessageStream, MessageAssembler, type AssembledMessage } from '@/lib/messageService';
 import { cn } from '@/lib/utils';
 

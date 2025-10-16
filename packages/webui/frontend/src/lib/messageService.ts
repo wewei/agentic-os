@@ -11,7 +11,7 @@ export type PostMessageResponse = {
 };
 
 export type ShellMessage = {
-  type: 'start' | 'content' | 'tool_call' | 'tool_result' | 'message_complete' | 'end' | 'error' | 'connection';
+  type: 'start' | 'content' | 'tool_call' | 'tool_result' | 'message_complete' | 'end' | 'error' | 'connection' | 'user';
   taskId: string;
   content?: string;
   messageId?: string;
@@ -59,7 +59,7 @@ export const sendMessage = async (message: string, taskId?: string): Promise<Pos
     throw new Error(`Failed to send message: ${response.statusText}`);
   }
 
-  return response.json();
+  return response.json() as Promise<PostMessageResponse>;
 };
 
 // Connect to SSE stream for a task
@@ -143,7 +143,7 @@ export class MessageAssembler {
 
     // Handle content messages
     if (type === 'content' && messageId && content) {
-      let fragments = this.fragments.get(messageId) || [];
+      const fragments = this.fragments.get(messageId) || [];
       
       const fragment: MessageFragment = {
         messageId,
