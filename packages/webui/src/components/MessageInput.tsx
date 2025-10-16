@@ -1,6 +1,7 @@
 import { Send, Loader2 } from 'lucide-react';
-import type { KeyboardEvent } from 'react';
 import React, { useState, useRef } from 'react';
+
+import type { KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +14,7 @@ type MessageInputProps = {
   className?: string;
 };
 
+// eslint-disable-next-line max-lines-per-function
 const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   disabled = false,

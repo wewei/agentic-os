@@ -75,114 +75,120 @@ export const connectMessageStream = (taskId?: string): EventSource => {
   return new EventSource(sseUrl);
 };
 
+// Message assembly helper functions
+const processConnectionMessage = (
+  shellMessage: ShellMessage
+): AssembledMessage => {
+  return {
+    id: `connection-${shellMessage.taskId}`,
+    taskId: shellMessage.taskId,
+    content: shellMessage.content || 'Connected to message stream',
+    type: 'system',
+    timestamp: new Date(),
+  };
+};
+
+const processUserMessage = (
+  shellMessage: ShellMessage
+): AssembledMessage => {
+  return {
+    id: `user-${Date.now()}`,
+    taskId: shellMessage.taskId,
+    content: shellMessage.content || '',
+    type: 'user',
+    timestamp: new Date(),
+  };
+};
+
+const processErrorMessage = (
+  shellMessage: ShellMessage
+): AssembledMessage => {
+  return {
+    id: `error-${Date.now()}`,
+    taskId: shellMessage.taskId,
+    content: shellMessage.error || 'An error occurred',
+    type: 'error',
+    timestamp: new Date(),
+  };
+};
+
+const processStartEndMessage = (
+  shellMessage: ShellMessage
+): AssembledMessage => {
+  return {
+    id: `${shellMessage.type}-${shellMessage.taskId}-${Date.now()}`,
+    taskId: shellMessage.taskId,
+    content: shellMessage.type === 'start' ? 'Starting...' : 'Completed',
+    type: 'system',
+    timestamp: new Date(),
+  };
+};
+
 // Message assembly logic
 export class MessageAssembler {
   private fragments = new Map<string, MessageFragment[]>();
   private assembledMessages = new Map<string, AssembledMessage>();
 
-  processMessage = (shellMessage: ShellMessage): AssembledMessage | null => {
-    const { messageId, taskId, type, content } = shellMessage;
-
-    // Handle connection messages
-    if (type === 'connection') {
-      return {
-        id: `connection-${taskId}`,
-        taskId,
-        content: content || 'Connected to message stream',
-        type: 'system',
+  private processToolMessage = (
+    shellMessage: ShellMessage
+  ): AssembledMessage | null => {
+    const messageId = shellMessage.messageId || `tool-${Date.now()}`;
+    let message = this.assembledMessages.get(messageId);
+    
+    if (!message) {
+      message = {
+        id: messageId,
+        taskId: shellMessage.taskId,
+        content: '',
+        type: 'agent',
         timestamp: new Date(),
+        toolCalls: [],
       };
+      this.assembledMessages.set(messageId, message);
     }
 
-    // Handle user messages (these come from the UI, not the stream)
-    if (type === 'user') {
-      return {
-        id: `user-${Date.now()}`,
-        taskId,
-        content: content || '',
-        type: 'user',
-        timestamp: new Date(),
-      };
-    }
-
-    // Handle error messages
-    if (type === 'error') {
-      return {
-        id: `error-${Date.now()}`,
-        taskId,
-        content: shellMessage.error || 'An error occurred',
-        type: 'error',
-        timestamp: new Date(),
-      };
-    }
-
-    // Handle tool calls and results
-    if (type === 'tool_call' || type === 'tool_result') {
-      const messageId = shellMessage.messageId || `tool-${Date.now()}`;
-      let message = this.assembledMessages.get(messageId);
-      
-      if (!message) {
-        message = {
-          id: messageId,
-          taskId,
-          content: '',
-          type: 'agent',
-          timestamp: new Date(),
-          toolCalls: [],
-        };
-        this.assembledMessages.set(messageId, message);
+    if (shellMessage.type === 'tool_call' && shellMessage.tool) {
+      message.toolCalls = message.toolCalls || [];
+      message.toolCalls.push({
+        tool: shellMessage.tool,
+        args: shellMessage.args,
+      });
+    } else if (shellMessage.type === 'tool_result' && shellMessage.result) {
+      const lastToolCall = message.toolCalls?.[message.toolCalls.length - 1];
+      if (lastToolCall) {
+        lastToolCall.result = shellMessage.result;
       }
-
-      if (type === 'tool_call' && shellMessage.tool) {
-        message.toolCalls = message.toolCalls || [];
-        message.toolCalls.push({
-          tool: shellMessage.tool,
-          args: shellMessage.args,
-        });
-      } else if (type === 'tool_result' && shellMessage.result) {
-        const lastToolCall = message.toolCalls?.[message.toolCalls.length - 1];
-        if (lastToolCall) {
-          lastToolCall.result = shellMessage.result;
-        }
-      }
-
-      return message;
     }
 
-    // Handle content messages
-    if (type === 'content' && messageId && content) {
-      const fragments = this.fragments.get(messageId) || [];
+    return message;
+  };
+
+  private processContentMessage = (
+    shellMessage: ShellMessage
+  ): AssembledMessage | null => {
+    const { messageId, taskId, content } = shellMessage;
+    
+    if (!messageId || !content) {
+      return null;
+    }
+
+    const fragments = this.fragments.get(messageId) || [];
+    
+    const fragment: MessageFragment = {
+      messageId,
+      content,
+      type: shellMessage.type,
+      isComplete: false,
+      timestamp: new Date(),
+    };
+    
+    fragments.push(fragment);
+    this.fragments.set(messageId, fragments);
+
+    if (shellMessage.type === 'message_complete') {
+      fragments.forEach(f => f.isComplete = true);
       
-      const fragment: MessageFragment = {
-        messageId,
-        content,
-        type,
-        isComplete: false,
-        timestamp: new Date(),
-      };
-      
-      fragments.push(fragment);
-      this.fragments.set(messageId, fragments);
-
-      // Check if message is complete
-      if (shellMessage.type === 'message_complete') {
-        fragments.forEach(f => f.isComplete = true);
-        
-        const assembledMessage: AssembledMessage = {
-          id: messageId,
-          taskId,
-          content: fragments.map(f => f.content).join(''),
-          type: 'agent',
-          timestamp: new Date(),
-          fragments,
-        };
-
-        this.assembledMessages.set(messageId, assembledMessage);
-        return assembledMessage;
-      }
-
-      // Return partial message for streaming
-      return {
+      const assembledMessage: AssembledMessage = {
         id: messageId,
         taskId,
         content: fragments.map(f => f.content).join(''),
@@ -190,17 +196,46 @@ export class MessageAssembler {
         timestamp: new Date(),
         fragments,
       };
+
+      this.assembledMessages.set(messageId, assembledMessage);
+      return assembledMessage;
     }
 
-    // Handle start and end messages
+    return {
+      id: messageId,
+      taskId,
+      content: fragments.map(f => f.content).join(''),
+      type: 'agent',
+      timestamp: new Date(),
+      fragments,
+    };
+  };
+
+  processMessage = (shellMessage: ShellMessage): AssembledMessage | null => {
+    const { type } = shellMessage;
+
+    if (type === 'connection') {
+      return processConnectionMessage(shellMessage);
+    }
+
+    if (type === 'user') {
+      return processUserMessage(shellMessage);
+    }
+
+    if (type === 'error') {
+      return processErrorMessage(shellMessage);
+    }
+
+    if (type === 'tool_call' || type === 'tool_result') {
+      return this.processToolMessage(shellMessage);
+    }
+
+    if (type === 'content') {
+      return this.processContentMessage(shellMessage);
+    }
+
     if (type === 'start' || type === 'end') {
-      return {
-        id: `${type}-${taskId}-${Date.now()}`,
-        taskId,
-        content: type === 'start' ? 'Starting...' : 'Completed',
-        type: 'system',
-        timestamp: new Date(),
-      };
+      return processStartEndMessage(shellMessage);
     }
 
     return null;

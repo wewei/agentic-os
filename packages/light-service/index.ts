@@ -4,6 +4,7 @@
 
 import { loadConfig } from './src/config';
 import { createLightServer } from './src/server';
+
 import type { AgenticConfig } from './src/types';
 
 const main = async (): Promise<void> => {

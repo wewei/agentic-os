@@ -77,7 +77,16 @@ const sendToExistingTask = async (
   message: string,
   llmConfig?: LLMConfig
 ): Promise<{ success: boolean; taskId: string; error?: string }> => {
-  const payload: any = {
+  type TaskSendPayload = {
+    receiverId: string;
+    message: string;
+    provider?: string;
+    model?: string;
+    topP?: number;
+    temperature?: number;
+  };
+
+  const payload: TaskSendPayload = {
     receiverId: taskId,
     message,
   };

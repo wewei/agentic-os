@@ -1,6 +1,9 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import globals from 'globals';
 
 export default tseslint.config(
   js.configs.recommended,
@@ -48,7 +51,27 @@ export default tseslint.config(
       // 其他项目规范
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/prefer-interface': 'off', // 我们使用 type 而非 interface
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     }
+  },
+  // React/WebUI 特定配置
+  {
+    files: ['packages/webui/**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
   },
   {
     ignores: [
@@ -56,6 +79,9 @@ export default tseslint.config(
       'dist/**',
       'build/**',
       '*.config.js',
+      'packages/*/node_modules/**',
+      'packages/*/dist/**',
+      'packages/*/build/**',
     ]
   }
 );

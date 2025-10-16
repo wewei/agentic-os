@@ -19,14 +19,22 @@
     "webui:build": "bun run --cwd packages/webui build",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "lint": "bun run --cwd packages/core lint && bun run --cwd packages/cli lint && bun run --cwd packages/light-service lint && bun run --cwd packages/webui lint",
-    "lint:fix": "bun run --cwd packages/core lint:fix && bun run --cwd packages/cli lint:fix && bun run --cwd packages/light-service lint:fix && bun run --cwd packages/webui lint:fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "clean": "rm -rf node_modules packages/*/node_modules",
     "install:all": "bun install"
   },
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@types/bun": "latest",
-    "typescript": "^5"
+    "@types/eslint__js": "^8.42.3",
+    "eslint": "^9.15.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "globals": "^13.20.0",
+    "typescript": "^5",
+    "typescript-eslint": "^8.15.0"
   },
   "keywords": [
     "agent",

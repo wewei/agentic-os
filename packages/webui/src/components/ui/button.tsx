@@ -56,4 +56,5 @@ export { Button }
 export type { ButtonProps }
 
 // Export buttonVariants separately to avoid fast-refresh warning
+// eslint-disable-next-line react-refresh/only-export-components
 export { buttonVariants }

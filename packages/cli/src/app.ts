@@ -8,6 +8,7 @@ import {
 } from '@agentic-os/core';
 
 import { loadConfig } from './config.ts';
+
 import type { MessageRequest } from './types.ts';
 
 /**

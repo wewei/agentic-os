@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
+// eslint-disable-next-line max-lines-per-function
 const App: React.FC = () => {
   const [messages, setMessages] = useState<AssembledMessage[]>([]);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
