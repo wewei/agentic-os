@@ -173,7 +173,7 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
     },
   })
     .with(ledger())
-    .with(modelManager(agenticConfig.model || { providers: {} }))
+    .with(modelManager(agenticConfig.model ?? { providers: {} }))
     .with(taskManager());
 
   const server = Bun.serve({
