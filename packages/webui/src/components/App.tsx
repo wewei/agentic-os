@@ -2,9 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import MessageInput from './MessageInput';
 import MessageList from './MessageList';
+import ModelSelector from './ModelSelector';
+
+import type { AssembledMessage, TaskModelConfig, LLMConfig } from '@/lib/messageService';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { sendMessage, connectMessageStream, MessageAssembler, type AssembledMessage } from '@/lib/messageService';
+import { sendMessage, connectMessageStream, MessageAssembler } from '@/lib/messageService';
 import { cn } from '@/lib/utils';
 
 type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error';
@@ -15,6 +18,7 @@ const App: React.FC = () => {
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<TaskModelConfig | null>(null);
   
   const messageAssembler = useRef(new MessageAssembler());
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -97,8 +101,17 @@ const App: React.FC = () => {
       
       setMessages(prev => [...prev, userMessage]);
 
+      // Prepare LLM config if this is a new task and model is selected
+      let llmConfig: LLMConfig | undefined;
+      if (!currentTaskId && selectedModel) {
+        llmConfig = {
+          provider: selectedModel.provider,
+          model: selectedModel.model,
+        };
+      }
+
       // Send to backend
-      const response = await sendMessage(message, currentTaskId || undefined);
+      const response = await sendMessage(message, currentTaskId || undefined, llmConfig);
       
       // Update task ID if this is a new conversation
       if (!currentTaskId) {
@@ -121,7 +134,7 @@ const App: React.FC = () => {
       
       setMessages(prev => [...prev, errorMessage]);
     }
-  }, [currentTaskId, connectToStream]);
+  }, [currentTaskId, selectedModel, connectToStream]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -199,16 +212,36 @@ const App: React.FC = () => {
         <MessageList messages={messages} />
       </div>
 
-      {/* Input */}
-      <MessageInput
-        onSendMessage={handleSendMessage}
-        disabled={connectionStatus === 'connecting'}
-        placeholder={
-          connectionStatus === 'connecting' 
-            ? 'Connecting to agent...' 
-            : 'Type your message here...'
-        }
-      />
+      {/* Input Area */}
+      <div className="border-t bg-background">
+        {/* Model Selector - only show for new tasks */}
+        {!currentTaskId && (
+          <div className="px-4 pt-3 pb-2 border-b">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                Model:
+              </label>
+              <ModelSelector
+                onModelSelect={setSelectedModel}
+                disabled={connectionStatus === 'connecting'}
+                className="flex-1"
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Message Input */}
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          disabled={connectionStatus === 'connecting'}
+          placeholder={
+            connectionStatus === 'connecting' 
+              ? 'Connecting to agent...' 
+              : 'Type your message here...'
+          }
+          className="border-0"
+        />
+      </div>
     </div>
   );
 };

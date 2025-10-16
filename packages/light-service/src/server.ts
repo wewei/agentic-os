@@ -174,7 +174,7 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
   })
     .with(ledger())
     .with(modelManager(agenticConfig.model ?? { providers: {} }))
-    .with(taskManager());
+    .with(taskManager(agenticConfig.task ?? {}));
 
   const server = Bun.serve({
     port,
@@ -264,6 +264,33 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
     });
   };
 
+  const handleGetModels = async (
+    corsHeaders: Record<string, string>
+  ): Promise<Response> => {
+    try {
+      const models = await agenticOS.getTaskModels();
+      return new Response(
+        JSON.stringify({ models }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    } catch (error) {
+      console.error('Failed to get models:', error);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to retrieve models',
+          models: []
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+  };
+
   const handleApiRequest = async (
     request: Request, 
     path: string, 
@@ -280,16 +307,7 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
       }
 
       if (path === `${apiPrefix}/models` && request.method === 'GET') {
-        return new Response(
-          JSON.stringify({ 
-            message: 'Models endpoint not yet implemented',
-            providers: []
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
+        return handleGetModels(corsHeaders);
       }
 
       return new Response(

@@ -1,6 +1,6 @@
 // Types for Light Service
 
-import type { LLMConfig, ModelManagerConfig } from '@agentic-os/core';
+import type { LLMConfig, ModelManagerConfig, TaskManagerConfig } from '@agentic-os/core';
 
 export type EndpointConfig = {
   host?: string;
@@ -15,10 +15,7 @@ export type EndpointConfig = {
 export type AgenticConfig = {
   endpoint?: EndpointConfig;
   model?: ModelManagerConfig;
-  task?: {
-    maxConcurrentTasks?: number;
-    taskTimeout?: number;
-  };
+  task?: TaskManagerConfig;
   ledger?: {
     persistence?: boolean;
     maxEntries?: number;

@@ -3,6 +3,16 @@
 import type { Task, Message } from '../types';
 import type { LLMConfig } from './runloop';
 
+export type TaskModelConfig = {
+  name: string; // Human-readable name
+  provider: string; // Provider (e.g., 'openai', 'anthropic')
+  model: string; // Model identifier (e.g., 'gpt-4', 'claude-3-opus')
+};
+
+export type TaskManagerConfig = {
+  availableModels?: TaskModelConfig[];
+};
+
 export type TaskState = {
   task: Task;
   messages: Message[];

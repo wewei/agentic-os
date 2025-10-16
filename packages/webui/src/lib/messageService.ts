@@ -1,8 +1,22 @@
 // Message service for WebUI frontend
 
+export type TaskModelConfig = {
+  name: string;
+  provider: string;
+  model: string;
+};
+
+export type LLMConfig = {
+  provider: string;
+  model: string;
+  topP?: number;
+  temperature?: number;
+};
+
 export type PostMessageRequest = {
   message: string;
   taskId?: string;
+  llmConfig?: LLMConfig;
 };
 
 export type PostMessageResponse = {
@@ -50,15 +64,37 @@ const getApiUrl = (): string => {
   return import.meta.env.VITE_AGENTIC_API_URL || 'http://localhost:3000/api';
 };
 
+// Fetch available models from backend
+export const fetchAvailableModels = async (): Promise<TaskModelConfig[]> => {
+  const apiUrl = getApiUrl();
+  const response = await fetch(`${apiUrl}/models`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models: ${response.statusText}`);
+  }
+
+  const data = await response.json() as { models: TaskModelConfig[] };
+  return data.models;
+};
+
 // Send message to backend
-export const sendMessage = async (message: string, taskId?: string): Promise<PostMessageResponse> => {
+export const sendMessage = async (
+  message: string,
+  taskId?: string,
+  llmConfig?: LLMConfig
+): Promise<PostMessageResponse> => {
   const apiUrl = getApiUrl();
   const response = await fetch(`${apiUrl}/send`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message, taskId }),
+    body: JSON.stringify({ message, taskId, llmConfig }),
   });
 
   if (!response.ok) {

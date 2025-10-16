@@ -27,8 +27,23 @@ model:
 
 # Task configuration
 task:
-  maxConcurrentTasks: 5  # Maximum concurrent tasks
-  taskTimeout: 300000  # Task timeout in milliseconds (5 minutes)
+  
+  # Available LLM models for tasks
+  # These models will appear in the model selector in the UI
+  availableModels:
+    - name: "GPT-4 Turbo"  # Human-readable name shown in UI
+      provider: "openai"   # Provider name (must match model.providers config)
+      model: "gpt-4-turbo"  # Model identifier
+    - name: "GPT-4"
+      provider: "openai"
+      model: "gpt-4"
+    - name: "GPT-3.5 Turbo"
+      provider: "openai"
+      model: "gpt-3.5-turbo"
+    # Add more models as needed
+    # - name: "Claude 3 Opus"
+    #   provider: "anthropic"
+    #   model: "claude-3-opus-20240229"
 
 # Ledger configuration
 ledger:
