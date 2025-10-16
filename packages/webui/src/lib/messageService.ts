@@ -13,6 +13,29 @@ export type LLMConfig = {
   temperature?: number;
 };
 
+export type Message = {
+  id: string;
+  taskId: string;
+  type: 'user' | 'agent';
+  content: string;
+  sentAt: number;
+};
+
+export type Task = {
+  id: string;
+  name: string;
+  isComplete: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type UIState = {
+  messages: Message[];
+  inputText: string;
+  llmConfig: LLMConfig;
+  tasks: Task[];
+};
+
 export type PostMessageRequest = {
   message: string;
   taskId?: string;
@@ -25,7 +48,7 @@ export type PostMessageResponse = {
 };
 
 export type ShellMessage = {
-  type: 'start' | 'content' | 'tool_call' | 'tool_result' | 'message_complete' | 'end' | 'error' | 'connection' | 'user';
+  type: 'start' | 'content' | 'tool_call' | 'tool_result' | 'message_complete' | 'end' | 'error' | 'connection' | 'user' | 'task_update';
   taskId: string;
   content?: string;
   messageId?: string;
@@ -35,6 +58,10 @@ export type ShellMessage = {
   result?: unknown;
   status?: string;
   error?: string;
+  taskName?: string;
+  isComplete?: boolean;
+  createdAt?: number;
+  updatedAt?: number;
 };
 
 export type MessageFragment = {
@@ -104,7 +131,13 @@ export const sendMessage = async (
   return response.json() as Promise<PostMessageResponse>;
 };
 
-// Connect to SSE stream for a task
+// Connect to global SSE stream
+export const connectGlobalStream = (): EventSource => {
+  const apiUrl = getApiUrl();
+  return new EventSource(`${apiUrl}/sse`);
+};
+
+// Connect to SSE stream for a task (deprecated, use connectGlobalStream)
 export const connectMessageStream = (taskId?: string): EventSource => {
   const apiUrl = getApiUrl();
   const sseUrl = taskId ? `${apiUrl}/sse/${taskId}` : `${apiUrl}/sse`;

@@ -186,10 +186,8 @@ const processLLMResponse = async (
     usage,
   });
 
-  if (content && content.length > 0) {
-    await streamContentToUser(callId, taskId, content, bus);
-  }
-
+  // No need to stream here - model layer already streamed to user via shell:send
+  
   const assistantMessage: Message = {
     id: generateMessageId(),
     taskId,
@@ -260,7 +258,7 @@ const runExecutionLoop = async (
       model: llmConfig.model,
       topP: llmConfig.topP,
       temperature: llmConfig.temperature,
-      streamToUser: true, // Enable streaming to user
+      streamToUser: true, // Always stream to user via model layer
       tools,
     };
 

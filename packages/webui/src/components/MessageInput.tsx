@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 type MessageInputProps = {
+  value: string;
+  onChange: (text: string) => void;
   onSendMessage: (message: string) => Promise<void>;
   disabled?: boolean;
   placeholder?: string;
@@ -16,17 +18,18 @@ type MessageInputProps = {
 
 // eslint-disable-next-line max-lines-per-function
 const MessageInput: React.FC<MessageInputProps> = ({
+  value,
+  onChange,
   onSendMessage,
   disabled = false,
   placeholder = "Type your message here...",
   className,
 }) => {
-  const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = async (): Promise<void> => {
-    const trimmedMessage = message.trim();
+    const trimmedMessage = value.trim();
     if (!trimmedMessage || isSending || disabled) {
       return;
     }
@@ -34,7 +37,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setIsSending(true);
     try {
       await onSendMessage(trimmedMessage);
-      setMessage('');
+      onChange('');
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -54,7 +57,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
-    setMessage(e.target.value);
+    onChange(e.target.value);
     
     // Auto-resize textarea
     const textarea = e.target;
@@ -62,14 +65,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
   };
 
-  const canSend = message.trim().length > 0 && !isSending && !disabled;
+  const canSend = value.trim().length > 0 && !isSending && !disabled;
 
   return (
     <div className={cn("flex gap-2 p-4 border-t bg-background", className)}>
       <div className="flex-1 relative">
         <Textarea
           ref={textareaRef}
-          value={message}
+          value={value}
           onChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}

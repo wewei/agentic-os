@@ -4,24 +4,125 @@ import MessageInput from './MessageInput';
 import MessageList from './MessageList';
 import ModelSelector from './ModelSelector';
 
-import type { AssembledMessage, TaskModelConfig, LLMConfig } from '@/lib/messageService';
+import type { 
+  UIState, 
+  Message, 
+  Task, 
+  LLMConfig, 
+  TaskModelConfig, 
+  ShellMessage 
+} from '@/lib/messageService';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { sendMessage, connectMessageStream, MessageAssembler } from '@/lib/messageService';
+import { sendMessage, connectGlobalStream } from '@/lib/messageService';
 import { cn } from '@/lib/utils';
 
 type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
+const createInitialState = (): UIState => ({
+  messages: [],
+  inputText: '',
+  llmConfig: {
+    provider: '',
+    model: '',
+  },
+  tasks: [],
+});
+
+const handleTaskUpdate = (
+  shellMessage: ShellMessage,
+  tasks: Task[]
+): Task[] => {
+  const taskIndex = tasks.findIndex(t => t.id === shellMessage.taskId);
+  const updatedTask: Task = {
+    id: shellMessage.taskId,
+    name: shellMessage.taskName || `Task ${shellMessage.taskId.slice(0, 8)}`,
+    isComplete: shellMessage.isComplete || false,
+    createdAt: shellMessage.createdAt || Date.now(),
+    updatedAt: shellMessage.updatedAt || Date.now(),
+  };
+
+  if (taskIndex >= 0) {
+    const updatedTasks = [...tasks];
+    updatedTasks[taskIndex] = updatedTask;
+    return updatedTasks;
+  }
+  return [...tasks, updatedTask];
+};
+
+const handleContentMessage = (
+  shellMessage: ShellMessage,
+  messages: Message[]
+): Message[] => {
+  const messageId = shellMessage.messageId || `msg-${Date.now()}`;
+  const existingIndex = messages.findIndex(m => m.id === messageId);
+
+  if (existingIndex >= 0) {
+    const updatedMessages = [...messages];
+    updatedMessages[existingIndex] = {
+      ...updatedMessages[existingIndex],
+      content: updatedMessages[existingIndex].content + (shellMessage.content || ''),
+      sentAt: Date.now(),
+    };
+    return updatedMessages;
+  }
+
+  const newMessage: Message = {
+    id: messageId,
+    taskId: shellMessage.taskId,
+    type: 'agent',
+    content: shellMessage.content || '',
+    sentAt: Date.now(),
+  };
+  return [...messages, newMessage];
+};
+
+const processShellMessage = (
+  shellMessage: ShellMessage, 
+  state: UIState
+): Partial<UIState> => {
+  const updates: Partial<UIState> = {};
+
+  if (shellMessage.type === 'connection') {
+    console.log('SSE connection confirmed:', shellMessage.content);
+    return updates;
+  }
+
+  if (shellMessage.type === 'task_update' || shellMessage.type === 'start') {
+    updates.tasks = handleTaskUpdate(shellMessage, state.tasks);
+  }
+
+  if (shellMessage.type === 'content' && shellMessage.content) {
+    updates.messages = handleContentMessage(shellMessage, state.messages);
+  }
+
+  if (shellMessage.type === 'user' && shellMessage.content) {
+    const newMessage: Message = {
+      id: `user-${Date.now()}`,
+      taskId: shellMessage.taskId,
+      type: 'user',
+      content: shellMessage.content,
+      sentAt: Date.now(),
+    };
+    updates.messages = [...state.messages, newMessage];
+  }
+
+  return updates;
+};
+
 // eslint-disable-next-line max-lines-per-function
 const App: React.FC = () => {
-  const [messages, setMessages] = useState<AssembledMessage[]>([]);
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [state, setState] = useState<UIState>(createInitialState());
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<TaskModelConfig | null>(null);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   
-  const messageAssembler = useRef(new MessageAssembler());
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Update state helper
+  const updateState = useCallback((updates: Partial<UIState>): void => {
+    setState(prev => ({ ...prev, ...updates }));
+  }, []);
 
   // Clean up SSE connection
   const cleanupConnection = useCallback((): void => {
@@ -32,50 +133,52 @@ const App: React.FC = () => {
     setConnectionStatus('idle');
   }, []);
 
-  // Connect to SSE stream for a task
-  const connectToStream = useCallback((taskId: string): void => {
+  // Connect to global SSE stream
+  const connectToGlobalStream = useCallback((): void => {
     cleanupConnection();
     
     setConnectionStatus('connecting');
     setError(null);
 
     try {
-      const eventSource = connectMessageStream(taskId);
+      const eventSource = connectGlobalStream();
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
         setConnectionStatus('connected');
-        console.log('Connected to message stream for task:', taskId);
+        console.log('Connected to global message stream');
       };
 
       eventSource.onmessage = (event) => {
         try {
-          const shellMessage = JSON.parse(event.data);
-          const assembledMessage = messageAssembler.current.processMessage(shellMessage);
+          const shellMessage = JSON.parse(event.data) as ShellMessage;
+          console.log('Received SSE message:', shellMessage.type, shellMessage);
           
-          if (assembledMessage) {
-            setMessages(prev => {
-              // Update existing message or add new one
-              const existingIndex = prev.findIndex(msg => msg.id === assembledMessage.id);
-              if (existingIndex >= 0) {
-                const updated = [...prev];
-                updated[existingIndex] = assembledMessage;
-                return updated;
-              } else {
-                return [...prev, assembledMessage];
-              }
-            });
-          }
+          setState(prevState => {
+            const updates = processShellMessage(shellMessage, prevState);
+            console.log('SSE updates:', updates);
+            console.log('Previous state messages:', prevState.messages.length);
+            const newState = { ...prevState, ...updates };
+            console.log('New state messages:', newState.messages.length);
+            return newState;
+          });
         } catch (error) {
           console.error('Error parsing SSE message:', error);
         }
       };
 
-      eventSource.onerror = (error) => {
-        console.error('SSE connection error:', error);
-        setConnectionStatus('error');
-        setError('Connection to message stream failed');
-        cleanupConnection();
+      eventSource.onerror = (err) => {
+        console.error('SSE connection error:', err);
+        console.error('EventSource readyState:', eventSource.readyState);
+        console.error('EventSource url:', eventSource.url);
+        
+        // Only set error state if connection was actually established
+        // ReadyState 0 = CONNECTING, 1 = OPEN, 2 = CLOSED
+        if (eventSource.readyState === 2) {
+          setConnectionStatus('error');
+          setError('Connection to message stream failed. Please check if the server is running.');
+          cleanupConnection();
+        }
       };
 
     } catch (error) {
@@ -85,63 +188,83 @@ const App: React.FC = () => {
     }
   }, [cleanupConnection]);
 
+  // Connect on mount
+  useEffect(() => {
+    connectToGlobalStream();
+    return () => {
+      cleanupConnection();
+    };
+  }, [connectToGlobalStream, cleanupConnection]);
+
   // Send message to backend
   const handleSendMessage = useCallback(async (message: string): Promise<void> => {
     try {
       setError(null);
       
-      // Add user message to UI immediately
-      const userMessage: AssembledMessage = {
-        id: `user-${Date.now()}`,
-        taskId: currentTaskId || 'new',
-        content: message,
-        type: 'user',
-        timestamp: new Date(),
-      };
+      const userMessageId = `user-${Date.now()}`;
+      console.log('Adding user message:', userMessageId, message);
       
-      setMessages(prev => [...prev, userMessage]);
-
-      // Prepare LLM config if this is a new task and model is selected
-      let llmConfig: LLMConfig | undefined;
-      if (!currentTaskId && selectedModel) {
-        llmConfig = {
-          provider: selectedModel.provider,
-          model: selectedModel.model,
+      // Add user message to state immediately
+      setState(prev => {
+        console.log('Previous messages count:', prev.messages.length);
+        const newState = {
+          ...prev,
+          messages: [...prev.messages, {
+            id: userMessageId,
+            taskId: currentTaskId || 'pending',
+            type: 'user' as const,
+            content: message,
+            sentAt: Date.now(),
+          }],
+          inputText: '',
         };
+        console.log('New messages count:', newState.messages.length);
+        return newState;
+      });
+
+      // Prepare LLM config if this is a new task
+      let llmConfig: LLMConfig | undefined;
+      if (!currentTaskId && state.llmConfig.provider && state.llmConfig.model) {
+        llmConfig = state.llmConfig;
       }
 
       // Send to backend
       const response = await sendMessage(message, currentTaskId || undefined, llmConfig);
+      console.log('Backend response:', response);
       
       // Update task ID if this is a new conversation
       if (!currentTaskId) {
         setCurrentTaskId(response.taskId);
-        connectToStream(response.taskId);
+        
+        // Update the user message with the correct task ID
+        setState(prev => ({
+          ...prev,
+          messages: prev.messages.map(m => 
+            m.id === userMessageId ? { ...m, taskId: response.taskId } : m
+          ),
+        }));
       }
 
     } catch (error) {
       console.error('Failed to send message:', error);
       setError(error instanceof Error ? error.message : 'Failed to send message');
-      
-      // Add error message to UI
-      const errorMessage: AssembledMessage = {
-        id: `error-${Date.now()}`,
-        taskId: currentTaskId || 'error',
-        content: 'Failed to send message. Please try again.',
-        type: 'error',
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
     }
-  }, [currentTaskId, selectedModel, connectToStream]);
+  }, [currentTaskId, state.llmConfig]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanupConnection();
-    };
-  }, [cleanupConnection]);
+  // Handle model selection
+  const handleModelSelect = useCallback((model: TaskModelConfig): void => {
+    updateState({
+      llmConfig: {
+        provider: model.provider,
+        model: model.model,
+      },
+    });
+  }, [updateState]);
+
+  // Handle input text change
+  const handleInputChange = useCallback((text: string): void => {
+    updateState({ inputText: text });
+  }, [updateState]);
 
   const getStatusColor = (status: ConnectionStatus): string => {
     switch (status) {
@@ -188,11 +311,6 @@ const App: React.FC = () => {
                 )} />
                 <span>{getStatusText(connectionStatus)}</span>
               </div>
-              {currentTaskId && (
-                <div className="text-muted-foreground">
-                  Task: {currentTaskId.slice(0, 8)}...
-                </div>
-              )}
             </div>
           </CardTitle>
         </CardHeader>
@@ -209,29 +327,29 @@ const App: React.FC = () => {
 
       {/* Messages */}
       <div className="flex-1 overflow-hidden">
-        <MessageList messages={messages} />
+        <MessageList messages={state.messages} />
       </div>
 
       {/* Input Area */}
       <div className="border-t bg-background">
-        {/* Model Selector - only show for new tasks */}
-        {!currentTaskId && (
-          <div className="px-4 pt-3 pb-2 border-b">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-                Model:
-              </label>
-              <ModelSelector
-                onModelSelect={setSelectedModel}
-                disabled={connectionStatus === 'connecting'}
-                className="flex-1"
-              />
-            </div>
+        {/* Model Selector - always visible */}
+        <div className="px-4 pt-3 pb-2 border-b">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+              Model:
+            </label>
+            <ModelSelector
+              onModelSelect={handleModelSelect}
+              disabled={connectionStatus === 'connecting'}
+              className="flex-1"
+            />
           </div>
-        )}
+        </div>
         
         {/* Message Input */}
         <MessageInput
+          value={state.inputText}
+          onChange={handleInputChange}
           onSendMessage={handleSendMessage}
           disabled={connectionStatus === 'connecting'}
           placeholder={

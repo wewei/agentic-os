@@ -146,12 +146,17 @@ const sendSSEMessage = (
   connection: SSEConnection,
   message: ShellMessage
 ): boolean => {
+  if (!connection.isActive) {
+    return false;
+  }
+
   try {
     const data = `data: ${JSON.stringify(message)}\n\n`;
     connection.controller.enqueue(new TextEncoder().encode(data));
     return true;
   } catch (error) {
-    logError('Error sending SSE message:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logError(`Error sending SSE message (taskId=${connection.taskId}, type=${message.type}): ${errorMsg}`);
     connection.isActive = false;
     return false;
   }
@@ -174,13 +179,52 @@ const createMessageHandler = (
       }
     }
     
-    // Forward to all global connections
-    globalConnections.forEach((conn, index) => {
-      if (conn.isActive && !sendSSEMessage(conn, message)) {
-        globalConnections.splice(index, 1);
+    // Forward to all global connections (iterate backwards to safely remove)
+    for (let i = globalConnections.length - 1; i >= 0; i--) {
+      const conn = globalConnections[i];
+      if (conn && conn.isActive) {
+        if (!sendSSEMessage(conn, message)) {
+          globalConnections.splice(i, 1);
+        }
       }
-    });
+    }
   };
+};
+
+const registerSSEConnection = (
+  taskId: string | undefined,
+  connection: SSEConnection,
+  sseConnections: Map<string, SSEConnection>,
+  globalConnections: SSEConnection[]
+): void => {
+  if (taskId) {
+    sseConnections.set(taskId, connection);
+    logInfo(`SSE connection established: taskId=${taskId}`);
+  } else {
+    globalConnections.push(connection);
+    logInfo('SSE global connection established');
+  }
+};
+
+const unregisterSSEConnection = (
+  taskId: string | undefined,
+  sseConnections: Map<string, SSEConnection>,
+  globalConnections: SSEConnection[]
+): void => {
+  if (taskId) {
+    const conn = sseConnections.get(taskId);
+    if (conn) {
+      conn.isActive = false;
+      sseConnections.delete(taskId);
+      logInfo(`SSE connection closed: taskId=${taskId}`);
+    }
+  } else {
+    const index = globalConnections.findIndex(c => !c.isActive);
+    if (index !== -1) {
+      globalConnections.splice(index, 1);
+      logInfo('SSE global connection closed');
+    }
+  }
 };
 
 const createSSEStream = (
@@ -188,6 +232,8 @@ const createSSEStream = (
   sseConnections: Map<string, SSEConnection>,
   globalConnections: SSEConnection[]
 ): ReadableStream => {
+  let keepAliveInterval: Timer | null = null;
+  
   return new ReadableStream({
     start(controller) {
       const initMessage = {
@@ -207,29 +253,26 @@ const createSSEStream = (
         isActive: true,
       };
 
-      if (taskId) {
-        sseConnections.set(taskId, connection);
-        logInfo(`SSE connection established: taskId=${taskId}`);
-      } else {
-        globalConnections.push(connection);
-        logInfo('SSE global connection established');
-      }
+      registerSSEConnection(taskId, connection, sseConnections, globalConnections);
+
+      // Send keep-alive comments every 30 seconds to prevent timeout
+      keepAliveInterval = setInterval(() => {
+        if (connection.isActive) {
+          try {
+            controller.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
+          } catch (error) {
+            console.error('Keep-alive failed:', error);
+            if (keepAliveInterval) clearInterval(keepAliveInterval);
+          }
+        }
+      }, 30000);
     },
     cancel() {
-      if (taskId) {
-        const conn = sseConnections.get(taskId);
-        if (conn) {
-          conn.isActive = false;
-          sseConnections.delete(taskId);
-          logInfo(`SSE connection closed: taskId=${taskId}`);
-        }
-      } else {
-        const index = globalConnections.findIndex(c => !c.isActive);
-        if (index !== -1) {
-          globalConnections.splice(index, 1);
-          logInfo('SSE global connection closed');
-        }
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
       }
+      unregisterSSEConnection(taskId, sseConnections, globalConnections);
     },
   });
 };
