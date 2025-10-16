@@ -30,6 +30,23 @@ Or use the binary:
 agentic-light-service
 ```
 
+### Verbose Mode
+
+Enable verbose mode to print logs to stdout:
+
+```bash
+agentic-light-service -v
+# or
+agentic-light-service --verbose
+```
+
+Logs are always written to `$HOME/.agentic-os/light-service-[epoch].log` regardless of verbose mode.
+
+**Log file location example:**
+```
+~/.agentic-os/light-service-1698765432123.log
+```
+
 ### As a Library
 
 ```typescript

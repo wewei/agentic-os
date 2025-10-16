@@ -2,6 +2,8 @@
 
 import { createAgenticOS, ledger, modelManager, taskManager } from '@agentic-os/core';
 
+import { logInfo, logError } from './logger';
+
 import type { AgenticConfig, PostMessageRequest, SSEConnection } from './types';
 import type { ShellMessage, PostRequest, PostResponse } from '@agentic-os/core';
 
@@ -69,6 +71,77 @@ const validatePostMessageRequest = (body: PostMessageRequest): ValidationResult 
   return { valid: true };
 };
 
+type MessageAccumulator = {
+  taskId: string;
+  messageId: string;
+  content: string;
+};
+
+const createMessageAccumulator = () => {
+  const accumulator = new Map<string, MessageAccumulator>();
+  
+  const accumulateContent = (message: ShellMessage): void => {
+    if (message.type !== 'content' || !message.messageId) return;
+    
+    const key = `${message.taskId}:${message.messageId}`;
+    const existing = accumulator.get(key);
+    
+    if (existing) {
+      existing.content += message.content || '';
+    } else {
+      accumulator.set(key, {
+        taskId: message.taskId,
+        messageId: message.messageId,
+        content: message.content || '',
+      });
+    }
+  };
+  
+  const getAndClearContent = (taskId: string, messageId: string): string => {
+    const key = `${taskId}:${messageId}`;
+    const accumulated = accumulator.get(key);
+    
+    if (accumulated) {
+      accumulator.delete(key);
+      return accumulated.content;
+    }
+    
+    return '';
+  };
+  
+  return { accumulateContent, getAndClearContent };
+};
+
+const createLogMessageEvent = () => {
+  const { accumulateContent, getAndClearContent } = createMessageAccumulator();
+  
+  return (message: ShellMessage): void => {
+    const taskId = message.taskId;
+    const messageId = message.messageId || 'N/A';
+    
+    switch (message.type) {
+      case 'start':
+        logInfo(`Task started: taskId=${taskId}`);
+        break;
+      case 'content':
+        accumulateContent(message);
+        break;
+      case 'end':
+        logInfo(`Task ended: taskId=${taskId}, status=${message.status || 'completed'}`);
+        break;
+      case 'message_complete': {
+        const fullContent = getAndClearContent(taskId, messageId);
+        logInfo(`Message complete: taskId=${taskId}, messageId=${messageId}, content=${fullContent}`);
+        break;
+      }
+      case 'error':
+        logError(`Task error: taskId=${taskId}, error=${message.error || 'unknown'}`);
+        break;
+      // Don't log tool_call, tool_result to avoid log spam
+    }
+  };
+};
+
 const sendSSEMessage = (
   connection: SSEConnection,
   message: ShellMessage
@@ -78,7 +151,7 @@ const sendSSEMessage = (
     connection.controller.enqueue(new TextEncoder().encode(data));
     return true;
   } catch (error) {
-    console.error('Error sending SSE message:', error);
+    logError('Error sending SSE message:', error);
     connection.isActive = false;
     return false;
   }
@@ -86,9 +159,13 @@ const sendSSEMessage = (
 
 const createMessageHandler = (
   sseConnections: Map<string, SSEConnection>,
-  globalConnections: SSEConnection[]
+  globalConnections: SSEConnection[],
+  logMessageEvent: (message: ShellMessage) => void
 ) => {
   return (message: ShellMessage) => {
+    // Log important message events
+    logMessageEvent(message);
+    
     // Forward to specific task connection
     const connection = sseConnections.get(message.taskId);
     if (connection && connection.isActive) {
@@ -132,8 +209,10 @@ const createSSEStream = (
 
       if (taskId) {
         sseConnections.set(taskId, connection);
+        logInfo(`SSE connection established: taskId=${taskId}`);
       } else {
         globalConnections.push(connection);
+        logInfo('SSE global connection established');
       }
     },
     cancel() {
@@ -142,11 +221,13 @@ const createSSEStream = (
         if (conn) {
           conn.isActive = false;
           sseConnections.delete(taskId);
+          logInfo(`SSE connection closed: taskId=${taskId}`);
         }
       } else {
         const index = globalConnections.findIndex(c => !c.isActive);
         if (index !== -1) {
           globalConnections.splice(index, 1);
+          logInfo('SSE global connection closed');
         }
       }
     },
@@ -166,10 +247,13 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
   const sseConnections = new Map<string, SSEConnection>();
   const globalConnections: SSEConnection[] = [];
   
+  // Create message event logger with accumulator
+  const logMessageEvent = createLogMessageEvent();
+  
   // Initialize AgenticOS with all modules
   const agenticOS = createAgenticOS({
     shell: {
-      onMessage: createMessageHandler(sseConnections, globalConnections),
+      onMessage: createMessageHandler(sseConnections, globalConnections, logMessageEvent),
     },
   })
     .with(ledger())
@@ -216,8 +300,12 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
   ): Promise<Response> => {
     const body = await request.json() as PostMessageRequest;
     
+    // Log incoming request
+    logInfo(`Received message request: taskId=${body.taskId || 'new'}, messageLength=${body.message.length}`);
+    
     const validation = validatePostMessageRequest(body);
     if (!validation.valid) {
+      logError(`Request validation failed: ${validation.error}`);
       return new Response(
         JSON.stringify({ error: validation.error }),
         { 
@@ -234,6 +322,8 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
     };
 
     const response: PostResponse = await agenticOS.post(postRequest);
+    
+    logInfo(`Message posted successfully: taskId=${response.taskId}, status=${response.status}`);
     
     return new Response(
       JSON.stringify(response),
@@ -277,7 +367,7 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
         }
       );
     } catch (error) {
-      console.error('Failed to get models:', error);
+      logError('Failed to get models:', error);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to retrieve models',
@@ -319,7 +409,7 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
       );
 
     } catch (error) {
-      console.error('API request error:', error);
+      logError('API request error:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'Internal server error';
       return new Response(
@@ -334,6 +424,13 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
 
   return {
     start: async () => {
+      logInfo(`Light Service starting on ${host}:${port}`);
+      logInfo(`API available at http://${host}:${port}/${basePath}`);
+      logInfo(`  - POST http://${host}:${port}/${basePath}/send`);
+      logInfo(`  - GET  http://${host}:${port}/${basePath}/sse/:taskId?`);
+      logInfo(`  - GET  http://${host}:${port}/${basePath}/models`);
+      
+      // Always show startup info to console
       console.log(`🚀 Light Service starting on ${host}:${port}`);
       console.log(`🔌 API available at http://${host}:${port}/${basePath}`);
       console.log(`   - POST http://${host}:${port}/${basePath}/send`);
@@ -352,7 +449,7 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
       globalConnections.length = 0;
       
       server.stop();
-      console.log('🛑 Light Service stopped');
+      logInfo('Light Service stopped');
     },
   };
 };
