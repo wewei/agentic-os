@@ -45,9 +45,15 @@ export type AssembledMessage = {
   }>;
 };
 
+// Get API URL from environment variable
+const getApiUrl = (): string => {
+  return import.meta.env.VITE_AGENTIC_API_URL || 'http://localhost:3000/api';
+};
+
 // Send message to backend
 export const sendMessage = async (message: string, taskId?: string): Promise<PostMessageResponse> => {
-  const response = await fetch('/api/message', {
+  const apiUrl = getApiUrl();
+  const response = await fetch(`${apiUrl}/send`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -63,8 +69,10 @@ export const sendMessage = async (message: string, taskId?: string): Promise<Pos
 };
 
 // Connect to SSE stream for a task
-export const connectMessageStream = (taskId: string): EventSource => {
-  return new EventSource(`/api/stream/${taskId}`);
+export const connectMessageStream = (taskId?: string): EventSource => {
+  const apiUrl = getApiUrl();
+  const sseUrl = taskId ? `${apiUrl}/sse/${taskId}` : `${apiUrl}/sse`;
+  return new EventSource(sseUrl);
 };
 
 // Message assembly logic

@@ -1,14 +1,11 @@
 {
   "name": "@agentic-os/webui",
   "version": "0.1.0",
-  "description": "Agentic OS WebUI - Web interface for interacting with agents",
+  "description": "Agentic OS WebUI - Frontend web interface for interacting with agents",
   "main": "index.ts",
   "module": "index.ts",
   "types": "index.ts",
   "type": "module",
-  "bin": {
-    "agentic-webui": "./index.ts"
-  },
   "exports": {
     ".": {
       "import": "./index.ts",
@@ -16,9 +13,10 @@
     }
   },
   "files": [
-    "frontend",
-    "backend",
+    "src",
+    "dist",
     "index.ts",
+    "index.html",
     "README.md",
     "LICENSE"
   ],
@@ -26,32 +24,42 @@
     "access": "public"
   },
   "scripts": {
-    "prepublishOnly": "bun run lint",
-    "dev": "bun run --watch index.ts",
-    "start": "bun run index.ts",
-    "build": "bun run --cwd frontend build",
-    "build:frontend": "bun run --cwd frontend build",
-    "dev:frontend": "bun run --cwd frontend dev",
+    "prepublishOnly": "bun run build",
+    "dev": "vite",
+    "start": "vite preview",
+    "build": "tsc && vite build",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@agentic-os/core": "workspace:*",
-    "js-yaml": "^4.1.0",
-    "uuid": "^11.0.3",
-    "zod": "^4.1.12"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "lucide-react": "^0.263.1",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^1.14.0",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-scroll-area": "^1.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@types/bun": "latest",
-    "@types/eslint__js": "^8.42.3",
-    "@types/js-yaml": "^4.0.9",
-    "@types/uuid": "^10.0.0",
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.14",
     "eslint": "^9.15.0",
-    "eslint-plugin-import": "^2.31.0",
-    "typescript-eslint": "^8.15.0"
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "globals": "^13.20.0",
+    "postcss": "^8.4.27",
+    "tailwindcss": "^3.3.3",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.0.2",
+    "typescript-eslint": "^8.15.0",
+    "vite": "^4.4.5"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -60,10 +68,10 @@
     "agent",
     "ai",
     "webui",
+    "frontend",
     "react",
-    "sse",
-    "typescript",
-    "bun"
+    "vite",
+    "typescript"
   ],
   "author": "",
   "license": "MIT",

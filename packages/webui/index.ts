@@ -1,55 +1,31 @@
 #!/usr/bin/env bun
 
-// WebUI Entry Point
+// WebUI Frontend Package Entry Point
+// Note: This package now contains only the frontend application.
+// For the backend API service, use @agentic-os/light-service instead.
 
-import type { AgenticConfig } from './backend/config';
-import { loadConfig } from './backend/config';
-import { createWebUIServer } from './backend/server';
+console.log(`
+⚠️  The WebUI package has been refactored to frontend-only.
 
-const main = async (): Promise<void> => {
-  // Load configuration from $HOME/.agent-os/config.yaml
-  const agenticConfig = loadConfig();
-  
-  // Merge with environment variables for webui config
-  const finalConfig: AgenticConfig = {
-    ...agenticConfig,
-    webui: {
-      port: agenticConfig.webui?.port || parseInt(process.env.PORT || '3000', 10),
-      cors: {
-        origin: agenticConfig.webui?.cors?.origin || process.env.CORS_ORIGIN || '*',
-        credentials: agenticConfig.webui?.cors?.credentials || process.env.CORS_CREDENTIALS === 'true',
-      },
-    },
-  };
+For the backend API service, please use @agentic-os/light-service:
+  bun install @agentic-os/light-service
+  bun run @agentic-os/light-service
 
-  // Create and start the server
-  const server = createWebUIServer(finalConfig);
-  
-  // Handle graceful shutdown
-  const shutdown = (): void => {
-    console.log('\n🛑 Shutting down WebUI server...');
-    server.stop();
-    process.exit(0);
-  };
+To build and serve the frontend:
+  cd packages/webui
+  bun install
+  bun run build
+  bun run start
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+Or for development:
+  bun run dev
+`);
 
-  try {
-    await server.start();
-  } catch (error) {
-    console.error('❌ Failed to start WebUI server:', error);
-    process.exit(1);
-  }
-};
-
-// Run if this file is executed directly
-if (import.meta.main) {
-  main().catch((error) => {
-    console.error('❌ Fatal error:', error);
-    process.exit(1);
-  });
-}
-
-export { createWebUIServer } from './backend/server';
-export type { WebUIConfig, PostMessageRequest, PostMessageResponse, SSEConnection } from './backend/types';
+// Re-export frontend types if needed
+export type {
+  PostMessageRequest,
+  PostMessageResponse,
+  ShellMessage,
+  AssembledMessage,
+  MessageFragment,
+} from './src/lib/messageService';

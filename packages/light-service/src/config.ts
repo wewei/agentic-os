@@ -1,35 +1,15 @@
-// Configuration loader for WebUI
+// Configuration loader for Light Service
 
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
-import type { ModelManagerConfig } from '@agentic-os/core';
 import yaml from 'js-yaml';
 
-export type WebUIConfig = {
-  port?: number;
-  cors?: {
-    origin?: string | string[];
-    credentials?: boolean;
-  };
-};
-
-export type AgenticConfig = {
-  webui?: WebUIConfig;
-  model?: ModelManagerConfig;
-  task?: {
-    maxConcurrentTasks?: number;
-    taskTimeout?: number;
-  };
-  ledger?: {
-    persistence?: boolean;
-    maxEntries?: number;
-  };
-};
+import type { AgenticConfig } from './types';
 
 const loadConfig = (): AgenticConfig => {
-  const configPath = join(homedir(), '.agent-os', 'config.yaml');
+  const configPath = join(homedir(), '.agentic-os', 'config.yaml');
   
   try {
     const configContent = readFileSync(configPath, 'utf-8');
@@ -44,3 +24,5 @@ const loadConfig = (): AgenticConfig => {
 };
 
 export { loadConfig };
+
+

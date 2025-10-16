@@ -1,6 +1,8 @@
 # @agentic-os/webui
 
-A modern web interface for interacting with Agentic OS agents, featuring real-time message streaming via Server-Sent Events (SSE).
+A modern frontend web interface for interacting with Agentic OS agents, featuring real-time message streaming via Server-Sent Events (SSE).
+
+> **Note**: This package now contains only the frontend application. For the backend API service, use [`@agentic-os/light-service`](../light-service/README.md) instead.
 
 ## Features
 
@@ -9,30 +11,34 @@ A modern web interface for interacting with Agentic OS agents, featuring real-ti
 - 🎨 **Modern UI**: Built with React, shadcn/ui, and Tailwind CSS
 - 🔧 **Tool Call Visualization**: See agent tool calls and results in real-time
 - 📱 **Responsive Design**: Works on desktop and mobile devices
-- ⚡ **Fast & Lightweight**: Built with Vite and Bun for optimal performance
+- ⚡ **Fast & Lightweight**: Built with Vite for optimal performance
+- 🔌 **Configurable Backend**: Connect to any Light Service backend via environment variables
 
 ## Architecture
 
-The WebUI package consists of two main parts:
+This is a **frontend-only** package that connects to the Light Service backend API:
 
-### Backend Server (`backend/`)
-- **Bun HTTP Server**: Serves the API and static files
-- **POST API**: `/api/message` - Send messages to agents
-- **SSE Stream**: `/api/stream/:taskId` - Real-time message streaming
-- **AgenticOS Integration**: Wraps the core AgenticOS with all modules
-
-### Frontend App (`frontend/`)
+### Frontend Application
 - **React Application**: Modern React app with TypeScript
 - **shadcn/ui Components**: Beautiful, accessible UI components
 - **Message Assembly**: Intelligently assembles streaming message fragments
 - **Real-time Updates**: Live message streaming with connection status
+- **Environment Configuration**: Backend API URL configured via environment variables
+- **Vite Build System**: Fast development and optimized production builds
+
+### Backend Service
+For the backend API, use **@agentic-os/light-service** which provides:
+- RESTful API endpoints
+- SSE streaming
+- AgenticOS integration
+- Configuration management
 
 ## Quick Start
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) installed
-- OpenAI API key (or other model provider)
+- [Bun](https://bun.sh) or [Node.js](https://nodejs.org) installed
+- A running instance of `@agentic-os/light-service` (the backend API)
 
 ### Installation
 
@@ -41,201 +47,188 @@ The WebUI package consists of two main parts:
    bun install
    ```
 
-2. **Set up environment variables**:
+2. **Configure backend API URL**:
+   Create a `.env` file:
    ```bash
-   export OPENAI_API_KEY="your-api-key-here"
-   export PORT=3000  # Optional, defaults to 3000
+   # Copy from example
+   cp .env.example .env
+   
+   # Edit .env
+   VITE_AGENTIC_API_URL=http://localhost:3000/api
    ```
 
-3. **Build the frontend**:
+3. **Start the development server**:
+   ```bash
+   bun run dev
+   ```
+   
+   The frontend will be available at http://localhost:5173
+
+### Production Build
+
+1. **Build the frontend**:
    ```bash
    bun run build
    ```
 
-4. **Start the server**:
+2. **Preview the production build**:
    ```bash
    bun run start
    ```
 
-5. **Open your browser**:
-   Navigate to `http://localhost:3000`
-
-## Development
-
-### Development Mode
-
-For development, you can run the frontend and backend separately:
-
-1. **Start the backend server**:
-   ```bash
-   bun run dev
-   ```
-
-2. **In another terminal, start the frontend dev server**:
-   ```bash
-   bun run dev:frontend
-   ```
-
-The frontend will be available at `http://localhost:5173` with hot reloading, and it will proxy API requests to the backend at `http://localhost:3000`.
-
-### From Root Directory
-
-You can also run WebUI commands from the monorepo root:
-
-```bash
-# Start WebUI server
-bun run webui
-
-# Start in development mode
-bun run webui:dev
-
-# Build frontend
-bun run webui:build
-
-# Start frontend dev server
-bun run webui:frontend:dev
-```
+3. **Deploy**: The built files are in `dist/` and can be deployed to any static hosting service (Vercel, Netlify, Cloudflare Pages, etc.)
 
 ## Configuration
 
-Create a `config.yaml` file based on `config.example.yaml`:
+### Environment Variables
 
-```yaml
-server:
-  port: 3000
-  cors:
-    origin: "*"
-    credentials: false
+The frontend uses the following environment variable:
 
-static:
-  path: "./frontend/dist"
-  fallback: "./frontend/dist/index.html"
+- `VITE_AGENTIC_API_URL` - The URL of the Light Service backend API
+  - Format: `http(s)://<host>:<port>/<path>`
+  - Example: `http://localhost:3000/api`
+  - Default: `http://localhost:3000/api`
 
-agentic:
-  model:
-    provider: "openai"
-    model: "gpt-4"
-    apiKey: "${OPENAI_API_KEY}"
+Create a `.env` file:
+
+```env
+VITE_AGENTIC_API_URL=http://localhost:3000/api
 ```
 
-## API Reference
+For production deployments, set this environment variable in your hosting platform.
 
-### POST `/api/message`
+## Development
 
-Send a message to the agent.
+### Project Structure
 
-**Request Body**:
-```json
-{
-  "message": "Hello, how can you help me?",
-  "taskId": "optional-existing-task-id"
-}
+```
+packages/webui/
+├── src/
+│   ├── components/       # React components
+│   │   ├── App.tsx       # Main application component
+│   │   ├── MessageInput.tsx
+│   │   ├── MessageList.tsx
+│   │   └── ui/           # shadcn/ui components
+│   ├── lib/              # Utilities and services
+│   │   └── messageService.ts  # API client
+│   ├── index.css         # Global styles
+│   └── main.tsx          # Entry point
+├── .env.example          # Environment variables example
+├── index.html            # HTML template
+├── index.ts              # Package entry point (info only)
+├── package.json          # Package dependencies and scripts
+├── vite.config.ts        # Vite configuration
+├── tsconfig.json         # TypeScript configuration
+└── README.md             # This file
 ```
 
-**Response**:
-```json
-{
-  "taskId": "generated-task-id",
-  "status": "accepted"
-}
+### Development Workflow
+
+1. **Start the backend service**:
+   ```bash
+   # In a separate terminal
+   cd ../light-service
+   bun run dev
+   ```
+
+2. **Start the frontend dev server**:
+   ```bash
+   cd frontend
+   bun run dev
+   ```
+
+3. **Make changes**: The dev server will hot-reload on changes
+
+4. **Build for production**:
+   ```bash
+   bun run build
+   ```
+
+### API Integration
+
+The frontend communicates with the Light Service backend via:
+
+- **POST `{VITE_AGENTIC_API_URL}/send`** - Send messages
+- **GET `{VITE_AGENTIC_API_URL}/sse/:taskId?`** - Receive real-time messages
+
+See the [messageService.ts](./frontend/src/lib/messageService.ts) file for implementation details.
+
+## Deployment
+
+### Static Hosting
+
+The frontend can be deployed to any static hosting service:
+
+1. **Build the frontend**:
+   ```bash
+   bun run build
+   ```
+
+2. **Deploy the `frontend/dist/` directory** to your hosting service:
+   - **Vercel**: `vercel deploy`
+   - **Netlify**: `netlify deploy`
+   - **Cloudflare Pages**: Connect your repository
+   - **GitHub Pages**: Copy `dist/` to `gh-pages` branch
+   - **S3/CloudFront**: Upload to S3 and configure CloudFront
+
+3. **Set environment variables** in your hosting platform:
+   - `VITE_AGENTIC_API_URL` - Your backend API URL
+
+### Environment-Specific Builds
+
+For different environments:
+
+```bash
+# Development
+VITE_AGENTIC_API_URL=http://localhost:3000/api bun run build
+
+# Staging
+VITE_AGENTIC_API_URL=https://staging-api.example.com/api bun run build
+
+# Production
+VITE_AGENTIC_API_URL=https://api.example.com/api bun run build
 ```
 
-### GET `/api/stream/:taskId`
+## Scripts
 
-Connect to the Server-Sent Events stream for a specific task.
+From the `packages/webui` directory:
 
-**Response**: Stream of JSON messages:
-```
-data: {"type":"start","taskId":"task-id","content":"Starting..."}
+- `bun run dev` - Start development server
+- `bun run build` - Build for production
+- `bun run start` - Preview production build
+- `bun run lint` - Lint code
+- `bun run lint:fix` - Fix linting errors
 
-data: {"type":"content","taskId":"task-id","messageId":"msg-id","content":"Hello"}
+## Troubleshooting
 
-data: {"type":"content","taskId":"task-id","messageId":"msg-id","content":" there!"}
+### Cannot connect to backend
 
-data: {"type":"message_complete","taskId":"task-id","messageId":"msg-id"}
+1. Verify the Light Service backend is running:
+   ```bash
+   curl http://localhost:3000/api/models
+   ```
 
-data: {"type":"end","taskId":"task-id","content":"Completed"}
-```
+2. Check the `VITE_AGENTIC_API_URL` environment variable is set correctly
 
-## Message Types
+3. Check CORS settings in the Light Service configuration
 
-The system handles several message types:
+### Build errors
 
-- **`start`**: Task has started
-- **`content`**: Text content fragment (streamed)
-- **`tool_call`**: Agent is calling a tool
-- **`tool_result`**: Tool execution result
-- **`message_complete`**: Message assembly is complete
-- **`end`**: Task has completed
-- **`error`**: An error occurred
+1. Clear cache and reinstall:
+   ```bash
+   cd frontend
+   rm -rf node_modules bun.lock dist
+   bun install
+   ```
 
-## Frontend Components
+2. Verify TypeScript configuration is correct
 
-### MessageList
-Displays the conversation history with:
-- User messages (right-aligned)
-- Agent messages (left-aligned, with streaming indicators)
-- System messages (centered)
-- Tool calls and results
-- Timestamps
+## Related Packages
 
-### MessageInput
-Text input with:
-- Auto-resize textarea
-- Enter to send, Shift+Enter for new line
-- Send button with loading state
-- Connection status awareness
-
-### App
-Main application component that:
-- Manages connection state
-- Handles message sending and receiving
-- Assembles streaming messages
-- Displays connection status and errors
-
-## Message Assembly
-
-The frontend intelligently assembles streaming messages:
-
-1. **Fragments**: Content messages are collected by `messageId`
-2. **Assembly**: Fragments are joined when `message_complete` is received
-3. **Streaming**: Partial messages are shown with a streaming indicator
-4. **Tool Calls**: Tool calls and results are displayed inline
-
-## Styling
-
-The UI uses:
-- **Tailwind CSS**: Utility-first CSS framework
-- **shadcn/ui**: Pre-built accessible components
-- **CSS Variables**: For theming and customization
-- **Responsive Design**: Mobile-first approach
-
-## Error Handling
-
-The system includes comprehensive error handling:
-
-- **Connection Errors**: Automatic reconnection attempts
-- **Message Errors**: User-friendly error messages
-- **API Errors**: Proper HTTP status codes and error responses
-- **Frontend Errors**: Error boundaries and fallback UI
-
-## Performance
-
-Optimizations include:
-
-- **Message Streaming**: Real-time updates without polling
-- **Efficient Rendering**: React optimizations and memoization
-- **Bundle Splitting**: Vite's automatic code splitting
-- **Static Serving**: Efficient static file serving with Bun
-
-## Contributing
-
-1. Follow the existing code style and patterns
-2. Use TypeScript for type safety
-3. Keep functions under 50 lines (extract subfunctions if needed)
-4. Use functional programming style
-5. Test your changes thoroughly
+- [@agentic-os/core](../core/README.md) - Core agent system (used by backend)
+- [@agentic-os/light-service](../light-service/README.md) - Backend API service
+- [@agentic-os/cli](../cli/README.md) - Command-line interface
 
 ## License
 
-MIT License - see the main repository for details.
+MIT
