@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 import type { SystemBus, AbilityMeta } from '../types';
-import type { ShellMessage } from './types';
+import type { ShellEvent, ContentEvent } from './types';
 
 // Schema definitions
 const SHELL_SEND_INPUT_SCHEMA = z.object({
@@ -34,24 +34,19 @@ type ShellSendInput = z.infer<typeof SHELL_SEND_INPUT_SCHEMA>;
 const handleShellSend = async (
   taskId: string,
   input: ShellSendInput,
-  onMessage: (message: ShellMessage) => void
+  onMessage: (event: ShellEvent) => void
 ) => {
   try {
-    onMessage({
+    const contentEvent: ContentEvent = {
       type: 'content',
       taskId,
-      content: input.content,
       messageId: input.messageId,
       index: input.index,
-    });
-
-    if (input.index < 0) {
-      onMessage({
-        type: 'message_complete',
-        taskId,
-        messageId: input.messageId,
-      });
-    }
+      content: input.content,
+      timestamp: Date.now(),
+    };
+    
+    onMessage(contentEvent);
 
     return {
       type: 'success' as const,
@@ -70,7 +65,7 @@ const handleShellSend = async (
 
 export const registerShellAbilities = (
   bus: SystemBus,
-  onMessage: (message: ShellMessage) => void
+  onMessage: (event: ShellEvent) => void
 ): void => {
   bus.register('shell:send', SHELL_SEND_META, async (_callId, taskId, input) => {
     return handleShellSend(taskId, input, onMessage);

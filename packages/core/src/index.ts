@@ -69,11 +69,23 @@ export const createAgenticOS = (config: AgenticOSConfig): AgenticOS => {
 };
 
 // Export types
-export type { SystemBus, Module } from './types';
+export type { SystemBus, Module, InvokeResult } from './types';
 export type { Ledger, LedgerConfig } from './ledger';
 export type { ModelManagerConfig } from './model';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';
-export type { ShellMessage, ShellConfig, PostRequest, PostResponse } from './shell/types';
+export type { 
+  ShellEvent,
+  TaskStartedEvent,
+  UserMessageRoutedEvent,
+  ContentEvent,
+  AbilityRequestEvent,
+  AbilityResponseEvent,
+  TaskCompletedEvent,
+  ErrorEvent,
+  ShellConfig, 
+  PostRequest, 
+  PostResponse 
+} from './shell/types';
 export type { LLMConfig, TaskManagerConfig, TaskModelConfig } from './task';
 
 // Export module factories

@@ -1,6 +1,20 @@
 // Types for Light Service
 
-import type { LLMConfig, ModelManagerConfig, TaskManagerConfig } from '@agentic-os/core';
+import type { ModelManagerConfig, TaskManagerConfig } from '@agentic-os/core';
+
+// Re-export event types from Core
+export type {
+  ShellEvent as SSEEvent,
+  TaskStartedEvent,
+  UserMessageRoutedEvent,
+  ContentEvent,
+  AbilityRequestEvent,
+  AbilityResponseEvent,
+  TaskCompletedEvent,
+  ErrorEvent,
+  PostRequest,
+  PostResponse,
+} from '@agentic-os/core';
 
 export type EndpointConfig = {
   host?: string;
@@ -22,24 +36,13 @@ export type AgenticConfig = {
   };
 };
 
-export type PostMessageRequest = {
-  message: string;
-  taskId?: string;
-  llmConfig?: LLMConfig;
-};
-
-export type PostMessageResponse = {
-  taskId: string;
-  status: string;
-};
+// Light Service uses Core's PostRequest/PostResponse types
+export type PostMessageRequest = import('@agentic-os/core').PostRequest;
+export type PostMessageResponse = import('@agentic-os/core').PostResponse;
 
 export type SSEConnection = {
   taskId: string;
   controller: ReadableStreamDefaultController;
   isActive: boolean;
 };
-
-// Re-export relevant types from core
-export type { ShellMessage, PostRequest, PostResponse } from '@agentic-os/core';
-
 

@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { registerShellAbilities } from './abilities';
 
 import type { SystemBus, Module, InvokeResult } from '../types';
-import type { ShellConfig, PostRequest, PostResponse } from './types';
+import type { ShellConfig, PostRequest, PostResponse, UserMessageRoutedEvent } from './types';
 import type { LLMConfig } from '../task/runloop';
 
 type ShellModule = Module & {
@@ -33,85 +33,44 @@ const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
 };
 
 const validatePostRequest = (request: PostRequest): void => {
+  // Validate userMessageId
+  if (typeof request.userMessageId !== 'string' || request.userMessageId.trim() === '') {
+    throw new ValidationError('Invalid userMessageId: must be non-empty string');
+  }
+  
+  // Validate message
   if (typeof request.message !== 'string' || request.message.trim() === '') {
     throw new ValidationError('Invalid message: must be non-empty string');
   }
-  if (request.taskId !== undefined && typeof request.taskId !== 'string') {
-    throw new ValidationError('Invalid taskId: must be string');
+  
+  // Validate llmConfig (required)
+  if (!request.llmConfig) {
+    throw new ValidationError('llmConfig is required');
+  }
+  if (typeof request.llmConfig.provider !== 'string' || request.llmConfig.provider.trim() === '') {
+    throw new ValidationError('Invalid provider: must be non-empty string');
+  }
+  if (typeof request.llmConfig.model !== 'string' || request.llmConfig.model.trim() === '') {
+    throw new ValidationError('Invalid model: must be non-empty string');
+  }
+  if (request.llmConfig.topP !== undefined && (typeof request.llmConfig.topP !== 'number' || request.llmConfig.topP < 0 || request.llmConfig.topP > 1)) {
+    throw new ValidationError('Invalid topP: must be number between 0 and 1');
+  }
+  if (request.llmConfig.temperature !== undefined && (typeof request.llmConfig.temperature !== 'number' || request.llmConfig.temperature < 0 || request.llmConfig.temperature > 2)) {
+    throw new ValidationError('Invalid temperature: must be number between 0 and 2');
   }
   
-  // For new tasks (no taskId), llmConfig is required
-  if (!request.taskId) {
-    if (!request.llmConfig) {
-      throw new ValidationError('llmConfig is required for new tasks');
+  // Validate relatedTaskIds
+  if (request.relatedTaskIds !== undefined) {
+    if (!Array.isArray(request.relatedTaskIds)) {
+      throw new ValidationError('relatedTaskIds must be an array');
     }
-    if (typeof request.llmConfig.provider !== 'string' || request.llmConfig.provider.trim() === '') {
-      throw new ValidationError('Invalid provider: must be non-empty string for new tasks');
-    }
-    if (typeof request.llmConfig.model !== 'string' || request.llmConfig.model.trim() === '') {
-      throw new ValidationError('Invalid model: must be non-empty string for new tasks');
-    }
-  }
-  
-  // For existing tasks, if llmConfig is provided, validate it
-  if (request.llmConfig) {
-    if (request.llmConfig.provider !== undefined && (typeof request.llmConfig.provider !== 'string' || request.llmConfig.provider.trim() === '')) {
-      throw new ValidationError('Invalid provider: must be non-empty string');
-    }
-    if (request.llmConfig.model !== undefined && (typeof request.llmConfig.model !== 'string' || request.llmConfig.model.trim() === '')) {
-      throw new ValidationError('Invalid model: must be non-empty string');
-    }
-    if (request.llmConfig.topP !== undefined && (typeof request.llmConfig.topP !== 'number' || request.llmConfig.topP < 0 || request.llmConfig.topP > 1)) {
-      throw new ValidationError('Invalid topP: must be number between 0 and 1');
-    }
-    if (request.llmConfig.temperature !== undefined && (typeof request.llmConfig.temperature !== 'number' || request.llmConfig.temperature < 0 || request.llmConfig.temperature > 2)) {
-      throw new ValidationError('Invalid temperature: must be number between 0 and 2');
+    for (const taskId of request.relatedTaskIds) {
+      if (typeof taskId !== 'string' || taskId.trim() === '') {
+        throw new ValidationError('All relatedTaskIds must be non-empty strings');
+      }
     }
   }
-};
-
-const sendToExistingTask = async (
-  callId: string,
-  bus: SystemBus,
-  taskId: string,
-  message: string,
-  llmConfig?: LLMConfig
-): Promise<{ success: boolean; taskId: string; error?: string }> => {
-  type TaskSendPayload = {
-    receiverId: string;
-    message: string;
-    provider?: string;
-    model?: string;
-    topP?: number;
-    temperature?: number;
-  };
-
-  const payload: TaskSendPayload = {
-    receiverId: taskId,
-    message,
-  };
-
-  // Only include LLM config if provided
-  if (llmConfig) {
-    payload.provider = llmConfig.provider;
-    payload.model = llmConfig.model;
-    payload.topP = llmConfig.topP;
-    payload.temperature = llmConfig.temperature;
-  }
-
-  const result = unwrapInvokeResult(await bus.invoke(
-    'task:send',
-    callId,
-    'shell',
-    JSON.stringify(payload)
-  ));
-  const parsed = JSON.parse(result);
-
-  if (!parsed.success) {
-    return { success: false, taskId, error: parsed.error };
-  }
-
-  return { success: true, taskId };
 };
 
 const createNewTask = async (
@@ -138,6 +97,49 @@ const createNewTask = async (
 
 export const shell = (config: ShellConfig): ShellModule => {
   let bus: SystemBus | undefined;
+  
+  // State for idempotency and routing
+  const processedMessages = new Set<string>();
+  const userMessageToTasks = new Map<string, Set<string>>();
+
+  const routeUserMessage = async (
+    callId: string,
+    request: PostRequest
+  ): Promise<string[]> => {
+    if (!bus) {
+      throw new Error('Shell not initialized: registerAbilities must be called first');
+    }
+
+    const { userMessageId, message, llmConfig } = request;
+    
+    // Idempotency check
+    if (processedMessages.has(userMessageId)) {
+      const existingTasks = userMessageToTasks.get(userMessageId);
+      return existingTasks ? Array.from(existingTasks) : [];
+    }
+    
+    processedMessages.add(userMessageId);
+    
+    // Create new task (simplified version, future can implement complex routing logic)
+    const taskId = await createNewTask(callId, bus, message, llmConfig);
+    
+    // Record mapping
+    if (!userMessageToTasks.has(userMessageId)) {
+      userMessageToTasks.set(userMessageId, new Set());
+    }
+    userMessageToTasks.get(userMessageId)!.add(taskId);
+    
+    // Send routed event
+    const routedEvent: UserMessageRoutedEvent = {
+      type: 'user_message_routed',
+      userMessageId,
+      taskId,
+      timestamp: Date.now(),
+    };
+    config.onMessage(routedEvent);
+    
+    return [taskId];
+  };
 
   return {
     registerAbilities: (systemBus: SystemBus): void => {
@@ -152,29 +154,12 @@ export const shell = (config: ShellConfig): ShellModule => {
 
       validatePostRequest(request);
 
-      const { message, taskId, llmConfig } = request;
       const callId = generateCallId();
-
-      let targetTaskId: string;
-
-      if (taskId) {
-        // For existing tasks, LLM config is optional
-        const result = await sendToExistingTask(callId, bus, taskId, message, llmConfig);
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to send message to task');
-        }
-        targetTaskId = result.taskId;
-      } else {
-        // For new tasks, LLM config is required (validated above)
-        if (!llmConfig) {
-          throw new ValidationError('llmConfig is required for new tasks');
-        }
-        targetTaskId = await createNewTask(callId, bus, message, llmConfig);
-      }
+      const routedTasks = await routeUserMessage(callId, request);
 
       return {
-        taskId: targetTaskId,
-        status: 'running',
+        status: 'ok',
+        routedTasks,
       };
     },
   };

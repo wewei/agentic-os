@@ -1,17 +1,30 @@
 // Message service for WebUI frontend
 
-export type TaskModelConfig = {
-  name: string;
-  provider: string;
-  model: string;
-};
+// Re-export event types from Core
+export type {
+  ShellEvent as SSEEvent,
+  TaskStartedEvent,
+  UserMessageRoutedEvent,
+  ContentEvent,
+  AbilityRequestEvent,
+  AbilityResponseEvent,
+  TaskCompletedEvent,
+  ErrorEvent,
+  PostRequest,
+  PostResponse,
+  LLMConfig,
+  TaskModelConfig,
+} from '@agentic-os/core';
 
-export type LLMConfig = {
-  provider: string;
-  model: string;
-  topP?: number;
-  temperature?: number;
-};
+// Re-import for local use
+import type {
+  ShellEvent as SSEEvent,
+  PostRequest,
+  PostResponse,
+  LLMConfig,
+  TaskModelConfig,
+  InvokeResult,
+} from '@agentic-os/core';
 
 export type Message = {
   id: string;
@@ -36,39 +49,10 @@ export type UIState = {
   tasks: Task[];
 };
 
-export type PostMessageRequest = {
-  message: string;
-  taskId?: string;
-  llmConfig?: LLMConfig;
-};
-
-export type PostMessageResponse = {
-  taskId: string;
-  status: string;
-};
-
-export type ShellMessage = {
-  type: 'start' | 'content' | 'tool_call' | 'tool_result' | 'message_complete' | 'end' | 'error' | 'connection' | 'user' | 'task_update';
-  taskId: string;
-  content?: string;
-  messageId?: string;
-  index?: number;
-  tool?: string;
-  args?: unknown;
-  result?: unknown;
-  status?: string;
-  error?: string;
-  taskName?: string;
-  isComplete?: boolean;
-  createdAt?: number;
-  updatedAt?: number;
-};
-
 export type MessageFragment = {
   messageId: string;
   content: string;
-  type: ShellMessage['type'];
-  isComplete: boolean;
+  index: number;
   timestamp: Date;
 };
 
@@ -78,11 +62,13 @@ export type AssembledMessage = {
   content: string;
   type: 'user' | 'agent' | 'system' | 'error';
   timestamp: Date;
+  isComplete: boolean;
   fragments?: MessageFragment[];
-  toolCalls?: Array<{
-    tool: string;
-    args: unknown;
-    result?: unknown;
+  abilityCalls?: Array<{
+    callId: string;
+    abilityId: string;
+    input: string;
+    result?: InvokeResult<string, string>;
   }>;
 };
 
@@ -109,26 +95,40 @@ export const fetchAvailableModels = async (): Promise<TaskModelConfig[]> => {
   return data.models;
 };
 
+// Generate unique user message ID
+const generateUserMessageId = (): string => {
+  return `user-msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+};
+
 // Send message to backend
 export const sendMessage = async (
   message: string,
-  taskId?: string,
-  llmConfig?: LLMConfig
-): Promise<PostMessageResponse> => {
+  llmConfig: LLMConfig,
+  relatedTaskIds?: string[]
+): Promise<PostResponse> => {
   const apiUrl = getApiUrl();
+  const userMessageId = generateUserMessageId();
+  
+  const requestBody: PostRequest = {
+    userMessageId,
+    message,
+    llmConfig,
+    relatedTaskIds,
+  };
+  
   const response = await fetch(`${apiUrl}/send`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ message, taskId, llmConfig }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     throw new Error(`Failed to send message: ${response.statusText}`);
   }
 
-  return response.json() as Promise<PostMessageResponse>;
+  return response.json() as Promise<PostResponse>;
 };
 
 // Connect to global SSE stream
@@ -137,177 +137,185 @@ export const connectGlobalStream = (): EventSource => {
   return new EventSource(`${apiUrl}/sse`);
 };
 
-// Connect to SSE stream for a task (deprecated, use connectGlobalStream)
+// Connect to SSE stream for a task
 export const connectMessageStream = (taskId?: string): EventSource => {
   const apiUrl = getApiUrl();
   const sseUrl = taskId ? `${apiUrl}/sse/${taskId}` : `${apiUrl}/sse`;
   return new EventSource(sseUrl);
 };
 
-// Message assembly helper functions
-const processConnectionMessage = (
-  shellMessage: ShellMessage
-): AssembledMessage => {
-  return {
-    id: `connection-${shellMessage.taskId}`,
-    taskId: shellMessage.taskId,
-    content: shellMessage.content || 'Connected to message stream',
-    type: 'system',
-    timestamp: new Date(),
-  };
-};
-
-const processUserMessage = (
-  shellMessage: ShellMessage
-): AssembledMessage => {
-  return {
-    id: `user-${Date.now()}`,
-    taskId: shellMessage.taskId,
-    content: shellMessage.content || '',
-    type: 'user',
-    timestamp: new Date(),
-  };
-};
-
-const processErrorMessage = (
-  shellMessage: ShellMessage
-): AssembledMessage => {
-  return {
-    id: `error-${Date.now()}`,
-    taskId: shellMessage.taskId,
-    content: shellMessage.error || 'An error occurred',
-    type: 'error',
-    timestamp: new Date(),
-  };
-};
-
-const processStartEndMessage = (
-  shellMessage: ShellMessage
-): AssembledMessage => {
-  return {
-    id: `${shellMessage.type}-${shellMessage.taskId}-${Date.now()}`,
-    taskId: shellMessage.taskId,
-    content: shellMessage.type === 'start' ? 'Starting...' : 'Completed',
-    type: 'system',
-    timestamp: new Date(),
-  };
-};
-
-// Message assembly logic
+// Message assembly logic - handles new SSEEvent types
 export class MessageAssembler {
-  private fragments = new Map<string, MessageFragment[]>();
+  private contentFragments = new Map<string, MessageFragment[]>();
   private assembledMessages = new Map<string, AssembledMessage>();
+  private abilityCalls = new Map<string, Map<string, {
+    callId: string;
+    abilityId: string;
+    input: string;
+    result?: InvokeResult<string, string>;
+  }>>();
 
-  private processToolMessage = (
-    shellMessage: ShellMessage
-  ): AssembledMessage | null => {
-    const messageId = shellMessage.messageId || `tool-${Date.now()}`;
-    let message = this.assembledMessages.get(messageId);
-    
-    if (!message) {
-      message = {
-        id: messageId,
-        taskId: shellMessage.taskId,
-        content: '',
-        type: 'agent',
-        timestamp: new Date(),
-        toolCalls: [],
-      };
-      this.assembledMessages.set(messageId, message);
-    }
-
-    if (shellMessage.type === 'tool_call' && shellMessage.tool) {
-      message.toolCalls = message.toolCalls || [];
-      message.toolCalls.push({
-        tool: shellMessage.tool,
-        args: shellMessage.args,
-      });
-    } else if (shellMessage.type === 'tool_result' && shellMessage.result) {
-      const lastToolCall = message.toolCalls?.[message.toolCalls.length - 1];
-      if (lastToolCall) {
-        lastToolCall.result = shellMessage.result;
-      }
-    }
-
+  private processTaskStarted = (event: import('@agentic-os/core').TaskStartedEvent): AssembledMessage => {
+    const message: AssembledMessage = {
+      id: `task-started-${event.taskId}`,
+      taskId: event.taskId,
+      content: `Task started: ${event.taskName}`,
+      type: 'system',
+      timestamp: new Date(event.timestamp),
+      isComplete: true,
+    };
     return message;
   };
 
-  private processContentMessage = (
-    shellMessage: ShellMessage
-  ): AssembledMessage | null => {
-    const { messageId, taskId, content } = shellMessage;
-    
-    if (!messageId || !content) {
-      return null;
-    }
-
-    const fragments = this.fragments.get(messageId) || [];
-    
-    const fragment: MessageFragment = {
-      messageId,
-      content,
-      type: shellMessage.type,
-      isComplete: false,
-      timestamp: new Date(),
+  private processUserMessageRouted = (event: import('@agentic-os/core').UserMessageRoutedEvent): AssembledMessage => {
+    const message: AssembledMessage = {
+      id: `routed-${event.userMessageId}-${event.taskId}`,
+      taskId: event.taskId,
+      content: `Message routed to task`,
+      type: 'system',
+      timestamp: new Date(event.timestamp),
+      isComplete: true,
     };
-    
-    fragments.push(fragment);
-    this.fragments.set(messageId, fragments);
+    return message;
+  };
 
-    if (shellMessage.type === 'message_complete') {
-      fragments.forEach(f => f.isComplete = true);
+  private processContent = (event: import('@agentic-os/core').ContentEvent): AssembledMessage | null => {
+    const { taskId, messageId, index, content, timestamp } = event;
+    
+    // If index is -1, message is complete
+    if (index === -1) {
+      const fragments = this.contentFragments.get(messageId) || [];
+      const fullContent = fragments.map(f => f.content).join('');
       
       const assembledMessage: AssembledMessage = {
         id: messageId,
         taskId,
-        content: fragments.map(f => f.content).join(''),
+        content: fullContent,
         type: 'agent',
-        timestamp: new Date(),
+        timestamp: new Date(timestamp),
+        isComplete: true,
         fragments,
       };
 
+      // Check if there are ability calls for this message
+      const calls = this.abilityCalls.get(messageId);
+      if (calls && calls.size > 0) {
+        assembledMessage.abilityCalls = Array.from(calls.values());
+      }
+
       this.assembledMessages.set(messageId, assembledMessage);
+      this.contentFragments.delete(messageId);
+      this.abilityCalls.delete(messageId);
+      
       return assembledMessage;
     }
 
+    // Accumulate content fragment
+    const fragments = this.contentFragments.get(messageId) || [];
+    const fragment: MessageFragment = {
+      messageId,
+      content,
+      index,
+      timestamp: new Date(timestamp),
+    };
+    fragments.push(fragment);
+    this.contentFragments.set(messageId, fragments);
+
+    // Return partial message for streaming display
     return {
       id: messageId,
       taskId,
       content: fragments.map(f => f.content).join(''),
       type: 'agent',
-      timestamp: new Date(),
+      timestamp: new Date(timestamp),
+      isComplete: false,
       fragments,
     };
   };
 
-  processMessage = (shellMessage: ShellMessage): AssembledMessage | null => {
-    const { type } = shellMessage;
-
-    if (type === 'connection') {
-      return processConnectionMessage(shellMessage);
+  private processAbilityRequest = (event: import('@agentic-os/core').AbilityRequestEvent): void => {
+    const { taskId, callId, abilityId, input } = event;
+    
+    // We don't have messageId from the event, so we'll need to track by taskId
+    // In a real implementation, you might want to correlate this with the current message
+    const messageId = `${taskId}-current`;
+    
+    if (!this.abilityCalls.has(messageId)) {
+      this.abilityCalls.set(messageId, new Map());
     }
+    
+    this.abilityCalls.get(messageId)!.set(callId, {
+      callId,
+      abilityId,
+      input,
+    });
+  };
 
-    if (type === 'user') {
-      return processUserMessage(shellMessage);
+  private processAbilityResponse = (event: import('@agentic-os/core').AbilityResponseEvent): void => {
+    const { taskId, callId, result } = event;
+    const messageId = `${taskId}-current`;
+    
+    const calls = this.abilityCalls.get(messageId);
+    if (calls) {
+      const call = calls.get(callId);
+      if (call) {
+        call.result = result;
+      }
     }
+  };
 
-    if (type === 'error') {
-      return processErrorMessage(shellMessage);
+  private processTaskCompleted = (event: import('@agentic-os/core').TaskCompletedEvent): AssembledMessage => {
+    const message: AssembledMessage = {
+      id: `task-completed-${event.taskId}`,
+      taskId: event.taskId,
+      content: 'Task completed',
+      type: 'system',
+      timestamp: new Date(event.timestamp),
+      isComplete: true,
+    };
+    return message;
+  };
+
+  private processError = (event: import('@agentic-os/core').ErrorEvent): AssembledMessage => {
+    const message: AssembledMessage = {
+      id: `error-${event.taskId || 'unknown'}-${event.timestamp}`,
+      taskId: event.taskId || 'unknown',
+      content: `Error [${event.errorCode}]: ${event.errorMessage}`,
+      type: 'error',
+      timestamp: new Date(event.timestamp),
+      isComplete: true,
+    };
+    return message;
+  };
+
+  processEvent = (event: SSEEvent): AssembledMessage | null => {
+    switch (event.type) {
+      case 'task_started':
+        return this.processTaskStarted(event);
+      
+      case 'user_message_routed':
+        return this.processUserMessageRouted(event);
+      
+      case 'content':
+        return this.processContent(event);
+      
+      case 'ability_request':
+        this.processAbilityRequest(event);
+        return null;
+      
+      case 'ability_response':
+        this.processAbilityResponse(event);
+        return null;
+      
+      case 'task_completed':
+        return this.processTaskCompleted(event);
+      
+      case 'error':
+        return this.processError(event);
+      
+      default:
+        return null;
     }
-
-    if (type === 'tool_call' || type === 'tool_result') {
-      return this.processToolMessage(shellMessage);
-    }
-
-    if (type === 'content') {
-      return this.processContentMessage(shellMessage);
-    }
-
-    if (type === 'start' || type === 'end') {
-      return processStartEndMessage(shellMessage);
-    }
-
-    return null;
   };
 
   // Get all assembled messages for a task
@@ -325,9 +333,15 @@ export class MessageAssembler {
       }
     });
     
-    this.fragments.forEach((fragments, messageId) => {
-      if (fragments.some(f => f.messageId === messageId)) {
-        this.fragments.delete(messageId);
+    this.contentFragments.forEach((fragments, messageId) => {
+      if (fragments.length > 0 && messageId.startsWith(taskId)) {
+        this.contentFragments.delete(messageId);
+      }
+    });
+    
+    this.abilityCalls.forEach((_calls, messageId) => {
+      if (messageId.startsWith(taskId)) {
+        this.abilityCalls.delete(messageId);
       }
     });
   };

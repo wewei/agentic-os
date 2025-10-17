@@ -4,9 +4,13 @@ import { createAgenticOS, ledger, modelManager, taskManager } from '@agentic-os/
 
 import { logInfo, logError } from './logger';
 
-import type { AgenticConfig, PostMessageRequest, SSEConnection } from './types';
-import type { ShellMessage, PostRequest, PostResponse } from '@agentic-os/core';
-
+import type { 
+  AgenticConfig, 
+  PostMessageRequest, 
+  PostMessageResponse,
+  SSEConnection,
+  SSEEvent,
+} from './types';
 
 export type LightServer = {
   start: () => Promise<void>;
@@ -18,6 +22,14 @@ type ValidationResult =
   | { valid: false; error: string };
 
 const validatePostMessageRequest = (body: PostMessageRequest): ValidationResult => {
+  // Validate userMessageId
+  if (!body.userMessageId || typeof body.userMessageId !== 'string') {
+    return { valid: false, error: 'userMessageId is required and must be a string' };
+  }
+  if (body.userMessageId.trim() === '') {
+    return { valid: false, error: 'userMessageId cannot be empty' };
+  }
+
   // Validate message
   if (!body.message || typeof body.message !== 'string') {
     return { valid: false, error: 'Message is required and must be a string' };
@@ -26,44 +38,35 @@ const validatePostMessageRequest = (body: PostMessageRequest): ValidationResult 
     return { valid: false, error: 'Message cannot be empty' };
   }
 
-  // Validate taskId if provided
-  if (body.taskId !== undefined && typeof body.taskId !== 'string') {
-    return { valid: false, error: 'taskId must be a string' };
+  // Validate llmConfig (always required)
+  if (!body.llmConfig) {
+    return { valid: false, error: 'llmConfig is required' };
   }
-
-  // For new tasks (no taskId), llmConfig is required
-  if (!body.taskId) {
-    if (!body.llmConfig) {
-      return { valid: false, error: 'llmConfig is required for new tasks' };
-    }
-    if (!body.llmConfig.provider || typeof body.llmConfig.provider !== 'string' || body.llmConfig.provider.trim() === '') {
-      return { valid: false, error: 'llmConfig.provider is required and must be a non-empty string for new tasks' };
-    }
-    if (!body.llmConfig.model || typeof body.llmConfig.model !== 'string' || body.llmConfig.model.trim() === '') {
-      return { valid: false, error: 'llmConfig.model is required and must be a non-empty string for new tasks' };
+  if (!body.llmConfig.provider || typeof body.llmConfig.provider !== 'string' || body.llmConfig.provider.trim() === '') {
+    return { valid: false, error: 'llmConfig.provider is required and must be a non-empty string' };
+  }
+  if (!body.llmConfig.model || typeof body.llmConfig.model !== 'string' || body.llmConfig.model.trim() === '') {
+    return { valid: false, error: 'llmConfig.model is required and must be a non-empty string' };
+  }
+  if (body.llmConfig.topP !== undefined) {
+    if (typeof body.llmConfig.topP !== 'number' || body.llmConfig.topP < 0 || body.llmConfig.topP > 1) {
+      return { valid: false, error: 'llmConfig.topP must be a number between 0 and 1' };
     }
   }
+  if (body.llmConfig.temperature !== undefined) {
+    if (typeof body.llmConfig.temperature !== 'number' || body.llmConfig.temperature < 0 || body.llmConfig.temperature > 2) {
+      return { valid: false, error: 'llmConfig.temperature must be a number between 0 and 2' };
+    }
+  }
 
-  // Validate llmConfig fields if provided
-  if (body.llmConfig) {
-    if (body.llmConfig.provider !== undefined) {
-      if (typeof body.llmConfig.provider !== 'string' || body.llmConfig.provider.trim() === '') {
-        return { valid: false, error: 'llmConfig.provider must be a non-empty string' };
-      }
+  // Validate relatedTaskIds if provided
+  if (body.relatedTaskIds !== undefined) {
+    if (!Array.isArray(body.relatedTaskIds)) {
+      return { valid: false, error: 'relatedTaskIds must be an array' };
     }
-    if (body.llmConfig.model !== undefined) {
-      if (typeof body.llmConfig.model !== 'string' || body.llmConfig.model.trim() === '') {
-        return { valid: false, error: 'llmConfig.model must be a non-empty string' };
-      }
-    }
-    if (body.llmConfig.topP !== undefined) {
-      if (typeof body.llmConfig.topP !== 'number' || body.llmConfig.topP < 0 || body.llmConfig.topP > 1) {
-        return { valid: false, error: 'llmConfig.topP must be a number between 0 and 1' };
-      }
-    }
-    if (body.llmConfig.temperature !== undefined) {
-      if (typeof body.llmConfig.temperature !== 'number' || body.llmConfig.temperature < 0 || body.llmConfig.temperature > 2) {
-        return { valid: false, error: 'llmConfig.temperature must be a number between 0 and 2' };
+    for (const taskId of body.relatedTaskIds) {
+      if (typeof taskId !== 'string' || taskId.trim() === '') {
+        return { valid: false, error: 'All relatedTaskIds must be non-empty strings' };
       }
     }
   }
@@ -71,111 +74,59 @@ const validatePostMessageRequest = (body: PostMessageRequest): ValidationResult 
   return { valid: true };
 };
 
-type MessageAccumulator = {
-  taskId: string;
-  messageId: string;
-  content: string;
-};
-
-const createMessageAccumulator = () => {
-  const accumulator = new Map<string, MessageAccumulator>();
-  
-  const accumulateContent = (message: ShellMessage): void => {
-    if (message.type !== 'content' || !message.messageId) return;
-    
-    const key = `${message.taskId}:${message.messageId}`;
-    const existing = accumulator.get(key);
-    
-    if (existing) {
-      existing.content += message.content || '';
-    } else {
-      accumulator.set(key, {
-        taskId: message.taskId,
-        messageId: message.messageId,
-        content: message.content || '',
-      });
-    }
-  };
-  
-  const getAndClearContent = (taskId: string, messageId: string): string => {
-    const key = `${taskId}:${messageId}`;
-    const accumulated = accumulator.get(key);
-    
-    if (accumulated) {
-      accumulator.delete(key);
-      return accumulated.content;
-    }
-    
-    return '';
-  };
-  
-  return { accumulateContent, getAndClearContent };
-};
-
-const createLogMessageEvent = () => {
-  const { accumulateContent, getAndClearContent } = createMessageAccumulator();
-  
-  return (message: ShellMessage): void => {
-    const taskId = message.taskId;
-    const messageId = message.messageId || 'N/A';
-    
-    switch (message.type) {
-      case 'start':
-        logInfo(`Task started: taskId=${taskId}`);
-        break;
-      case 'content':
-        accumulateContent(message);
-        break;
-      case 'end':
-        logInfo(`Task ended: taskId=${taskId}, status=${message.status || 'completed'}`);
-        break;
-      case 'message_complete': {
-        const fullContent = getAndClearContent(taskId, messageId);
-        logInfo(`Message complete: taskId=${taskId}, messageId=${messageId}, content=${fullContent}`);
-        break;
-      }
-      case 'error':
-        logError(`Task error: taskId=${taskId}, error=${message.error || 'unknown'}`);
-        break;
-      // Don't log tool_call, tool_result to avoid log spam
-    }
-  };
-};
-
-const sendSSEMessage = (
+const sendSSEEvent = (
   connection: SSEConnection,
-  message: ShellMessage
+  event: SSEEvent
 ): boolean => {
   if (!connection.isActive) {
     return false;
   }
 
   try {
-    const data = `data: ${JSON.stringify(message)}\n\n`;
+    const data = `data: ${JSON.stringify(event)}\n\n`;
     connection.controller.enqueue(new TextEncoder().encode(data));
     return true;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    logError(`Error sending SSE message (taskId=${connection.taskId}, type=${message.type}): ${errorMsg}`);
+    const taskId = 'taskId' in event ? event.taskId : 'unknown';
+    logError(`Error sending SSE event (taskId=${taskId}, type=${event.type}): ${errorMsg}`);
     connection.isActive = false;
     return false;
   }
 };
 
+const logSSEEvent = (event: SSEEvent): void => {
+  switch (event.type) {
+    case 'task_started':
+      logInfo(`Task started: taskId=${event.taskId}, triggerMessage=${event.triggerMessageId}`);
+      break;
+    case 'task_completed':
+      logInfo(`Task completed: taskId=${event.taskId}`);
+      break;
+    case 'error':
+      logError(`Error: taskId=${event.taskId || 'unknown'}, code=${event.errorCode}, message=${event.errorMessage}`);
+      break;
+    // Don't log content, ability_request, ability_response to avoid spam
+  }
+};
+
 const createMessageHandler = (
   sseConnections: Map<string, SSEConnection>,
-  globalConnections: SSEConnection[],
-  logMessageEvent: (message: ShellMessage) => void
+  globalConnections: SSEConnection[]
 ) => {
-  return (message: ShellMessage) => {
-    // Log important message events
-    logMessageEvent(message);
+  return (event: SSEEvent) => {
+    logSSEEvent(event);
+    
+    // Extract taskId from event (different events have it in different places)
+    const taskId = 'taskId' in event ? event.taskId : '';
     
     // Forward to specific task connection
-    const connection = sseConnections.get(message.taskId);
-    if (connection && connection.isActive) {
-      if (!sendSSEMessage(connection, message)) {
-        sseConnections.delete(message.taskId);
+    if (taskId) {
+      const connection = sseConnections.get(taskId);
+      if (connection && connection.isActive) {
+        if (!sendSSEEvent(connection, event)) {
+          sseConnections.delete(taskId);
+        }
       }
     }
     
@@ -183,7 +134,7 @@ const createMessageHandler = (
     for (let i = globalConnections.length - 1; i >= 0; i--) {
       const conn = globalConnections[i];
       if (conn && conn.isActive) {
-        if (!sendSSEMessage(conn, message)) {
+        if (!sendSSEEvent(conn, event)) {
           globalConnections.splice(i, 1);
         }
       }
@@ -290,13 +241,10 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
   const sseConnections = new Map<string, SSEConnection>();
   const globalConnections: SSEConnection[] = [];
   
-  // Create message event logger with accumulator
-  const logMessageEvent = createLogMessageEvent();
-  
   // Initialize AgenticOS with all modules
   const agenticOS = createAgenticOS({
     shell: {
-      onMessage: createMessageHandler(sseConnections, globalConnections, logMessageEvent),
+      onMessage: createMessageHandler(sseConnections, globalConnections),
     },
   })
     .with(ledger())
@@ -344,7 +292,7 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
     const body = await request.json() as PostMessageRequest;
     
     // Log incoming request
-    logInfo(`Received message request: taskId=${body.taskId || 'new'}, messageLength=${body.message.length}`);
+    logInfo(`Received message request: userMessageId=${body.userMessageId}, messageLength=${body.message.length}`);
     
     const validation = validatePostMessageRequest(body);
     if (!validation.valid) {
@@ -358,15 +306,10 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
       );
     }
 
-    const postRequest: PostRequest = {
-      message: body.message,
-      ...(body.taskId && { taskId: body.taskId }),
-      ...(body.llmConfig && { llmConfig: body.llmConfig }),
-    };
-
-    const response: PostResponse = await agenticOS.post(postRequest);
+    // Use Core's PostRequest type directly
+    const response = await agenticOS.post(body);
     
-    logInfo(`Message posted successfully: taskId=${response.taskId}, status=${response.status}`);
+    logInfo(`Message posted successfully: userMessageId=${body.userMessageId}, routedTasks=${response.routedTasks.join(', ')}`);
     
     return new Response(
       JSON.stringify(response),
@@ -498,5 +441,4 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
 };
 
 export { createLightServer };
-
 

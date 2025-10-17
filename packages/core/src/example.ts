@@ -6,7 +6,7 @@ import {
   taskManager,
   ledger,
   type ModelManagerConfig,
-  type ShellMessage,
+  type ShellEvent,
   type AgenticOS,
 } from './index';
 
@@ -21,9 +21,9 @@ type SSEConnection = {
 
 const activeConnections = new Map<string, Set<SSEConnection>>();
 
-const formatSSE = (message: ShellMessage): Uint8Array => {
-  const type = message.type || 'message';
-  const json = JSON.stringify(message);
+const formatSSE = (event: ShellEvent): Uint8Array => {
+  const type = event.type || 'message';
+  const json = JSON.stringify(event);
   const sse = `event: ${type}\ndata: ${json}\n\n`;
   return new TextEncoder().encode(sse);
 };
@@ -45,18 +45,20 @@ const removeConnection = (key: string, connection: SSEConnection): void => {
   }
 };
 
-const sendToConnections = (message: ShellMessage): void => {
-  const formatted = formatSSE(message);
-  const taskId = message.taskId;
+const sendToConnections = (event: ShellEvent): void => {
+  const formatted = formatSSE(event);
+  const taskId = 'taskId' in event ? event.taskId : '';
 
   // Send to specific task connections
-  const taskConnections = activeConnections.get(taskId);
-  if (taskConnections) {
-    for (const connection of taskConnections) {
-      try {
-        connection.controller.enqueue(formatted);
-      } catch {
-        removeConnection(taskId, connection);
+  if (taskId) {
+    const taskConnections = activeConnections.get(taskId);
+    if (taskConnections) {
+      for (const connection of taskConnections) {
+        try {
+          connection.controller.enqueue(formatted);
+        } catch {
+          removeConnection(taskId, connection);
+        }
       }
     }
   }
@@ -88,11 +90,10 @@ const createSSEStream = (taskId?: string): ReadableStream => {
 
       addConnection(key, connection);
 
-      const startEvent = formatSSE({
-        type: 'start',
-        taskId: key,
-      });
-      controller.enqueue(startEvent);
+      // Send connection info as comment
+      controller.enqueue(
+        new TextEncoder().encode(`: connected to ${key}\n\n`)
+      );
 
       heartbeatInterval = setInterval(() => {
         try {
@@ -131,7 +132,12 @@ const createHTTPServer = (agenticOS: AgenticOS, port: number): Server<undefined>
     // POST /send
     if (url.pathname === '/send' && req.method === 'POST') {
       try {
-        const body = await req.json() as { message: string; taskId?: string };
+        const body = await req.json() as { 
+          userMessageId: string;
+          message: string; 
+          llmConfig: { provider: string; model: string };
+          relatedTaskIds?: string[];
+        };
         const result = await agenticOS.post(body);
         return Response.json(result);
       } catch (error) {
