@@ -4,7 +4,7 @@ import type { LLMConfig } from '../task/runloop';
 import type { InvokeResult } from '../types';
 
 // ============================================================================
-// Shell Event Types - Replaces ShellMessage
+// Shell Event Types
 // ============================================================================
 
 export type TaskStartedEvent = {
@@ -74,12 +74,14 @@ export type ShellEvent =
   | ErrorEvent;
 
 // ============================================================================
-// Shell Configuration
+// Shell Interface
 // ============================================================================
 
-export type ShellConfig = {
-  onMessage: (event: ShellEvent) => void;
+export type Shell = {
+  // 路由用户消息（供主入口使用）
+  post: (request: PostRequest) => Promise<PostResponse>;
 };
+
 
 // ============================================================================
 // Post Request/Response Types

@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import type { SystemBus, AbilityMeta, AbilityResult } from '../types';
+import type { ContentEvent } from '../shell/types';
 import type {
   ProviderRegistry,
   ProviderConfig,
@@ -23,7 +24,7 @@ const MODEL_LLM_INPUT_SCHEMA = z.object({
   temperature: z.number().optional().describe('Temperature for this completion'),
   maxTokens: z.number().optional().describe('Max tokens for this completion'),
   topP: z.number().optional().describe('Top P for this completion'),
-  streamToUser: z.boolean().optional().describe('Whether to stream output to user via shell:send'),
+  streamToUser: z.boolean().optional().describe('Whether to stream output to user via bus.sendShellEvent'),
   tools: z.array(z.any()).optional().describe('Optional tool definitions'),
 });
 
@@ -137,16 +138,15 @@ const handleStreamCompletion = async (
   for await (const chunk of adapter.completeStream(config, model, messages, options)) {
     if (chunk.content) {
       fullContent += chunk.content;
-      await bus.invoke(
-        'shell:send',
-        callId,
+      const event: ContentEvent = {
+        type: 'content',
         taskId,
-        JSON.stringify({
-          content: chunk.content,
-          messageId,
-          index: chunk.finished ? -1 : chunkIndex++,
-        })
-      );
+        messageId,
+        content: chunk.content,
+        index: chunk.finished ? -1 : chunkIndex++,
+        timestamp: Date.now(),
+      };
+      bus.sendShellEvent(event);
     }
     if (chunk.toolCalls) {
       finalToolCalls = chunk.toolCalls;

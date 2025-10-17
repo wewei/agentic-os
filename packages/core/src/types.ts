@@ -97,6 +97,34 @@ export type RegisteredAbility = {
   handler: InternalAbilityHandler;
 };
 
+// Forward declare ShellEvent (avoid circular dependency)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ShellEvent = any;
+
+// ============================================================================
+// Bus Delegate Types (Observer Pattern)
+// ============================================================================
+
+/**
+ * BusDelegate - Interface for Bus to communicate with external systems
+ * 
+ * Currently, ShellConfig has the same structure as BusDelegate.
+ * However, they serve different purposes:
+ * - BusDelegate: Internal interface for Bus to send events/logs
+ * - ShellConfig: User-facing configuration for Shell creation
+ * 
+ * In the future, ShellConfig may be extended with additional fields
+ * while BusDelegate remains focused on the Bus's needs.
+ */
+export type BusDelegate = {
+  // Event sending
+  sendShellEvent: (event: ShellEvent) => void;
+  
+  // Logging
+  logError: (taskId: string, message: string) => void;
+  logInfo: (taskId: string, message: string) => void;
+};
+
 // ============================================================================
 // System Bus Types
 // ============================================================================
@@ -110,6 +138,12 @@ export type SystemBus = {
   ) => void;
   unregister: (abilityId: string) => void;
   has: (abilityId: string) => boolean;
+  
+  // Delegate management
+  setDelegate: (delegate: BusDelegate) => void;
+  
+  // Delegate proxy methods
+  sendShellEvent: (event: ShellEvent) => void;
   logError: (taskId: string, message: string) => void;
   logInfo: (taskId: string, message: string) => void;
 };

@@ -1,20 +1,11 @@
 // Agentic OS - Main Entry Point
 
 import { createSystemBus } from './bus';
-import { shell } from './shell';
+import { createShell } from './shell';
 
-import type { BusLogCallbacks } from './bus';
-import type { ShellConfig, PostRequest, PostResponse } from './shell/types';
+import type { PostRequest, PostResponse, Shell } from './shell/types';
 import type { TaskModelConfig } from './task';
-import type { Module, SystemBus } from './types';
-
-export type AgenticOSConfig = {
-  shell: ShellConfig;
-  bus?: {
-    logError?: (taskId: string, message: string) => void;
-    logInfo?: (taskId: string, message: string) => void;
-  };
-};
+import type { Module, BusDelegate } from './types';
 
 export type AgenticOS = {
   with: (module: Module) => AgenticOS;
@@ -32,34 +23,25 @@ const unwrapInvokeResult = <T>(
   throw new Error(`Invoke failed (${result.type}): ${errorMsg}`);
 };
 
-export const createAgenticOS = (config: AgenticOSConfig): AgenticOS => {
+export const createAgenticOS = (delegate: BusDelegate): AgenticOS => {
   console.log('Creating Agentic OS...');
 
-  // Create System Bus with bus controller and optional log callbacks
-  const busLogCallbacks: BusLogCallbacks | undefined = config.bus ? {
-    logError: config.bus.logError || ((taskId, msg) => console.error('[Bus Error]', `[${taskId}]`, msg)),
-    logInfo: config.bus.logInfo || ((taskId, msg) => console.info('[Bus Info]', `[${taskId}]`, msg)),
-  } : undefined;
-  
-  const bus: SystemBus = createSystemBus(busLogCallbacks);
+  // Create System Bus with delegate
+  const bus = createSystemBus(delegate);
 
-  // Create shell module with config
-  const shellModule = shell(config.shell);
+  // Create Shell (only needs Bus to invoke abilities)
+  const shellInstance: Shell = createShell(bus);
 
-  // Register shell immediately (always present)
-  shellModule.registerAbilities(bus);
-
-  console.log('✓ Agentic OS created with minimal bus and shell');
+  console.log('✓ Agentic OS created with bus and shell');
 
   const agenticOS: AgenticOS = {
     with: (module: Module): AgenticOS => {
-      // Register module immediately when added
       module.registerAbilities(bus);
       return agenticOS;
     },
 
     post: async (request: PostRequest): Promise<PostResponse> => {
-      return shellModule.post(request);
+      return shellInstance.post(request);
     },
 
     getTaskModels: async (): Promise<TaskModelConfig[]> => {
@@ -79,12 +61,12 @@ export const createAgenticOS = (config: AgenticOSConfig): AgenticOS => {
 };
 
 // Export types
-export type { SystemBus, Module, InvokeResult } from './types';
-export type { BusLogCallbacks } from './bus';
+export type { SystemBus, Module, InvokeResult, BusDelegate } from './types';
 export type { Ledger, LedgerConfig } from './ledger';
 export type { ModelManagerConfig } from './model';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';
 export type { 
+  Shell,
   ShellEvent,
   TaskStartedEvent,
   UserMessageRoutedEvent,
@@ -93,7 +75,6 @@ export type {
   AbilityResponseEvent,
   TaskCompletedEvent,
   ErrorEvent,
-  ShellConfig, 
   PostRequest, 
   PostResponse 
 } from './shell/types';

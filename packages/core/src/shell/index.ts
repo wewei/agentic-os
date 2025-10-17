@@ -1,16 +1,15 @@
-// Shell Module - Message Handler
+// Shell Module - Direct Service (Not a Bus Module)
 
 import { v4 as uuidv4 } from 'uuid';
 
-import { registerShellAbilities } from './abilities';
-
-import type { SystemBus, Module, InvokeResult } from '../types';
-import type { ShellConfig, PostRequest, PostResponse, UserMessageRoutedEvent } from './types';
+import type { SystemBus, InvokeResult } from '../types';
+import type { 
+  Shell, 
+  PostRequest, 
+  PostResponse, 
+  UserMessageRoutedEvent 
+} from './types';
 import type { LLMConfig } from '../task/runloop';
-
-type ShellModule = Module & {
-  post: (request: PostRequest) => Promise<PostResponse>;
-};
 
 // Custom error for validation failures
 export class ValidationError extends Error {
@@ -33,17 +32,14 @@ const unwrapInvokeResult = (result: InvokeResult<string, string>): string => {
 };
 
 const validatePostRequest = (request: PostRequest): void => {
-  // Validate userMessageId
   if (typeof request.userMessageId !== 'string' || request.userMessageId.trim() === '') {
     throw new ValidationError('Invalid userMessageId: must be non-empty string');
   }
   
-  // Validate message
   if (typeof request.message !== 'string' || request.message.trim() === '') {
     throw new ValidationError('Invalid message: must be non-empty string');
   }
   
-  // Validate llmConfig (required)
   if (!request.llmConfig) {
     throw new ValidationError('llmConfig is required');
   }
@@ -60,7 +56,6 @@ const validatePostRequest = (request: PostRequest): void => {
     throw new ValidationError('Invalid temperature: must be number between 0 and 2');
   }
   
-  // Validate relatedTaskIds
   if (request.relatedTaskIds !== undefined) {
     if (!Array.isArray(request.relatedTaskIds)) {
       throw new ValidationError('relatedTaskIds must be an array');
@@ -95,73 +90,56 @@ const createNewTask = async (
   return parsed.taskId;
 };
 
-export const shell = (config: ShellConfig): ShellModule => {
-  let bus: SystemBus | undefined;
-  
-  // State for idempotency and routing
-  const processedMessages = new Set<string>();
-  const userMessageToTasks = new Map<string, Set<string>>();
 
-  const routeUserMessage = async (
-    callId: string,
-    request: PostRequest
-  ): Promise<string[]> => {
-    if (!bus) {
-      throw new Error('Shell not initialized: registerAbilities must be called first');
-    }
-
+const createMessageRouter = (
+  bus: SystemBus,
+  processedMessages: Set<string>,
+  userMessageToTasks: Map<string, Set<string>>
+) => {
+  return async (callId: string, request: PostRequest): Promise<string[]> => {
     const { userMessageId, message, llmConfig } = request;
     
-    // Idempotency check
     if (processedMessages.has(userMessageId)) {
       const existingTasks = userMessageToTasks.get(userMessageId);
       return existingTasks ? Array.from(existingTasks) : [];
     }
     
     processedMessages.add(userMessageId);
-    
-    // Create new task (simplified version, future can implement complex routing logic)
     const taskId = await createNewTask(callId, bus, message, llmConfig);
     
-    // Record mapping
     if (!userMessageToTasks.has(userMessageId)) {
       userMessageToTasks.set(userMessageId, new Set());
     }
     userMessageToTasks.get(userMessageId)!.add(taskId);
     
-    // Send routed event
     const routedEvent: UserMessageRoutedEvent = {
       type: 'user_message_routed',
       userMessageId,
       taskId,
       timestamp: Date.now(),
     };
-    config.onMessage(routedEvent);
+    bus.sendShellEvent(routedEvent);
     
     return [taskId];
   };
+};
+
+export const createShell = (bus: SystemBus): Shell => {
+  const processedMessages = new Set<string>();
+  const userMessageToTasks = new Map<string, Set<string>>();
+
+  const routeUserMessage = createMessageRouter(
+    bus,
+    processedMessages,
+    userMessageToTasks
+  );
 
   return {
-    registerAbilities: (systemBus: SystemBus): void => {
-      bus = systemBus;
-      registerShellAbilities(bus, config.onMessage);
-    },
-
     post: async (request: PostRequest): Promise<PostResponse> => {
-      if (!bus) {
-        throw new Error('Shell not initialized: registerAbilities must be called first');
-      }
-
       validatePostRequest(request);
-
       const callId = generateCallId();
       const routedTasks = await routeUserMessage(callId, request);
-
-      return {
-        status: 'ok',
-        routedTasks,
-      };
+      return { status: 'ok', routedTasks };
     },
   };
 };
-

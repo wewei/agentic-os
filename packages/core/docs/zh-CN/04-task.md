@@ -450,3 +450,73 @@ console.log(`${tasks.length} active tasks`);
 
 由于代码内容太长，我会将完整的翻译内容继续写入文件，包含所有代码示例和详细说明。
 
+
+
+## Task 模型配置
+
+### 概述
+
+Task Manager 支持配置可用的 LLM 模型列表，每个模型具有人类可读的名称。这些配置通过 `task:models` 能力暴露，可在前端模型选择器中显示。
+
+### 配置类型
+
+```typescript
+type TaskModelConfig = {
+  name: string;      // 人类可读名称 (如 "GPT-4 Turbo")
+  provider: string;  // 提供商 (如 "openai", "anthropic")
+  model: string;     // 模型标识符 (如 "gpt-4-turbo")
+};
+
+type TaskManagerConfig = {
+  availableModels?: TaskModelConfig[];
+};
+```
+
+### 默认模型
+
+如果未提供配置，使用以下默认模型：
+
+- **GPT-4 Turbo** (openai/gpt-4-turbo)
+- **GPT-4** (openai/gpt-4)
+- **GPT-3.5 Turbo** (openai/gpt-3.5-turbo)
+
+### 自定义模型配置
+
+#### 配置文件方式 (~/.agentic-os/config.yaml)
+
+```yaml
+task:
+  availableModels:
+    - name: "GPT-4 Turbo"
+      provider: "openai"
+      model: "gpt-4-turbo"
+    - name: "Claude 3 Opus"
+      provider: "anthropic"
+      model: "claude-3-opus-20240229"
+```
+
+#### 代码方式
+
+```typescript
+import { taskManager } from '@agentic-os/core';
+
+const task = taskManager({
+  availableModels: [
+    { name: 'GPT-4 Turbo', provider: 'openai', model: 'gpt-4-turbo' },
+    { name: 'Claude 3 Opus', provider: 'anthropic', model: 'claude-3-opus-20240229' },
+  ],
+});
+```
+
+### task:models 能力
+
+```typescript
+// 获取可用模型列表
+const result = await bus.invoke('task:models', callId, 'system', '{}');
+const { models } = JSON.parse(unwrapResult(result));
+```
+
+### 与前端集成
+
+前端可以调用 `/api/models` 获取可用模型列表，在创建新任务时传递选中的模型配置。
+

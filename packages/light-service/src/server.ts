@@ -157,16 +157,12 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
   const globalConnections: SSEConnection[] = [];
   
   const agenticOS = createAgenticOS({
-    shell: {
-      onMessage: createMessageHandler(sseConnections, globalConnections),
+    sendShellEvent: createMessageHandler(sseConnections, globalConnections),
+    logError: (taskId, message) => {
+      logError(`[${taskId}] ${message}`);
     },
-    bus: {
-      logError: (taskId, message) => {
-        logError(`[${taskId}] ${message}`);
-      },
-      logInfo: (taskId, message) => {
-        logInfo(`[${taskId}] ${message}`);
-      },
+    logInfo: (taskId, message) => {
+      logInfo(`[${taskId}] ${message}`);
     },
   })
     .with(ledger())

@@ -202,16 +202,12 @@ const modelConfig: ModelManagerConfig = {
 
 const main = async () => {
   const agenticOS = createAgenticOS({
-    shell: {
-      onMessage: sendToConnections,
+    sendShellEvent: sendToConnections,
+    logError: (taskId, message) => {
+      console.error(`[${taskId}] ${message}`);
     },
-    bus: {
-      logError: (taskId, message) => {
-        console.error(`[Bus Error] [${taskId}] ${message}`);
-      },
-      logInfo: (taskId, message) => {
-        console.info(`[Bus Info] [${taskId}] ${message}`);
-      },
+    logInfo: (taskId, message) => {
+      console.info(`[${taskId}] ${message}`);
     },
   })
     .with(modelManager(modelConfig))

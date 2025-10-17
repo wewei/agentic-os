@@ -2,7 +2,7 @@
 
 ## 概述
 
-**System Bus** 是 Agentic OS 的中央通信枢纽。就像硬件中的系统总线一样，它实现了所有模块之间的解耦通信。系统中的每个功能都通过统一接口通过总线访问。
+**System Bus** 是 Agentic OS 的中央通信枢纽。就像硬件中的系统总线一样，它实现了所有模块之间的解耦通信。System Bus 采用 **Delegate 模式**，通过 BusDelegate 与外部系统（如 Shell）通信，实现事件驱动的架构。
 
 ## 核心概念
 
@@ -55,7 +55,56 @@
 └─────────────────────────────────────────────────┘
 ```
 
-## Agent Bus 接口
+## BusDelegate 模式
+
+### Delegate 接口
+
+Bus 通过 BusDelegate 与外部系统通信：
+
+```typescript
+/**
+ * BusDelegate - Bus 与外部系统通信的接口
+ * 
+ * Bus 不直接依赖任何模块（包括 Shell），而是通过 delegate
+ * 发送事件和日志。这实现了松耦合和可测试性。
+ */
+type BusDelegate = {
+  // 发送事件（能力调用、任务状态等）
+  sendShellEvent: (event: ShellEvent) => void;
+  
+  // 日志
+  logError: (taskId: string, message: string) => void;
+  logInfo: (taskId: string, message: string) => void;
+};
+```
+
+### 事件类型
+
+Bus 发送的事件：
+
+```typescript
+// 能力调用请求事件
+type AbilityRequestEvent = {
+  type: 'ability_request';
+  taskId: string;
+  callId: string;
+  abilityId: string;
+  input: string;
+  timestamp: number;
+};
+
+// 能力调用响应事件
+type AbilityResponseEvent = {
+  type: 'ability_response';
+  taskId: string;
+  callId: string;
+  abilityId: string;
+  result: InvokeResult<string, string>;
+  timestamp: number;
+};
+```
+
+## System Bus 接口
 
 ### 类型定义
 
@@ -95,17 +144,23 @@ type RegisteredAbility = {
   handler: AbilityHandler;
 };
 
-// Agent Bus 公共接口
-type AgentBus = {
+// System Bus 公共接口
+type SystemBus = {
   // 调用能力
   // abilityId: 能力标识符（如 'task:spawn'）
+  // callId: 调用 ID，用于追踪
   // callerId: 调用方任务 ID，用于追踪和审计
   // input: JSON 编码的参数
   // 返回: InvokeResult，永不 reject
-  invoke: (abilityId: string, callerId: string, input: string) => Promise<InvokeResult<string, string>>;
+  invoke: (
+    abilityId: string,
+    callId: string,
+    callerId: string,
+    input: string
+  ) => Promise<InvokeResult<string, string>>;
   
   // 注册新能力
-  register: (meta: AbilityMeta, handler: AbilityHandler) => void;
+  register: (abilityId: string, meta: AbilityMeta, handler: AbilityHandler) => void;
   
   // 注销能力
   unregister: (abilityId: string) => void;
@@ -113,14 +168,12 @@ type AgentBus = {
   // 检查能力是否存在
   has: (abilityId: string) => boolean;
   
-  // 记录错误日志
-  // taskId: 任务 ID
-  // message: 日志内容
-  logError: (taskId: string, message: string) => void;
+  // Delegate 管理
+  setDelegate: (delegate: BusDelegate) => void;
   
-  // 记录信息日志
-  // taskId: 任务 ID
-  // message: 日志内容
+  // Delegate 代理方法（转发到 delegate）
+  sendShellEvent: (event: ShellEvent) => void;
+  logError: (taskId: string, message: string) => void;
   logInfo: (taskId: string, message: string) => void;
 };
 ```
@@ -341,72 +394,80 @@ bus.unregister('task:spawn');
 - 临时能力覆盖
 - 模块关闭时清理
 
-### 日志 API
+### Delegate API
 
-#### logError() 和 logInfo()
+#### setDelegate() - 设置 Delegate
 
-模块可以通过总线记录错误和信息日志：
+设置 Bus 的 delegate，通常在初始化时调用：
 
 ```typescript
-// 在能力 handler 中使用日志
-bus.register(
-  {
-    id: 'task:spawn',
-    moduleName: 'task',
-    abilityName: 'spawn',
-    description: 'Create a new task',
-    inputSchema,
-    outputSchema
+const shellDelegate: BusDelegate = {
+  sendShellEvent: (event) => {
+    // 通过 SSE 推送事件到客户端
+    broadcastToClients(event);
   },
-  async (callId: string, taskId: string, input: string): Promise<AbilityResult<string, string>> => {
+  logError: (taskId, message) => {
+    console.error(`[${taskId}]`, message);
+  },
+  logInfo: (taskId, message) => {
+    console.log(`[${taskId}]`, message);
+  },
+};
+
+bus.setDelegate(shellDelegate);
+```
+
+#### sendShellEvent() - 发送事件
+
+模块可以通过 Bus 发送事件到 delegate：
+
+```typescript
+// Bus 在能力调用时自动发送事件
+// 1. 调用开始
+const requestEvent: AbilityRequestEvent = {
+  type: 'ability_request',
+  taskId: callerId,
+  callId,
+  abilityId,
+  input,
+  timestamp: Date.now(),
+};
+bus.sendShellEvent(requestEvent);
+
+// 2. 调用结束
+const responseEvent: AbilityResponseEvent = {
+  type: 'ability_response',
+  taskId: callerId,
+  callId,
+  abilityId,
+  result: handlerResult,
+  timestamp: Date.now(),
+};
+bus.sendShellEvent(responseEvent);
+```
+
+#### logError() 和 logInfo() - 日志
+
+模块可以通过 Bus 记录日志（转发到 delegate）：
+
+```typescript
+bus.register(
+  'task:spawn',
+  TASK_SPAWN_META,
+  async (callId, taskId, input) => {
+    bus.logInfo(taskId, 'Creating new task');
+    
     try {
-      bus.logInfo(taskId, 'Creating new task');
-      const { goal, parentTaskId } = JSON.parse(input);
-      const task = createTask(goal, parentTaskId);
-      bus.logInfo(task.id, `Task created successfully: ${goal}`);
-      return { 
-        type: 'success', 
-        result: JSON.stringify({ taskId: task.id, status: task.status }) 
-      };
+      const task = createTask(input);
+      bus.logInfo(task.id, `Task created: ${task.goal}`);
+      return { type: 'success', result: task };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      bus.logError(taskId, `Failed to create task: ${errorMsg}`);
-      return { 
-        type: 'error', 
-        error: errorMsg
-      };
+      bus.logError(taskId, `Failed to create task: ${error.message}`);
+      return { type: 'error', error: error.message };
     }
   }
 );
 ```
-
-**配置日志回调**：
-
-在创建 AgenticOS 实例时，可以通过 `bus` 配置传入自定义日志回调：
-
-```typescript
-import { createAgenticOS } from '@agentic-os/core';
-
-const agenticOS = createAgenticOS({
-  shell: {
-    onMessage: (event) => console.log(event),
-  },
-  bus: {
-    logError: (taskId, message) => {
-      // 自定义错误日志处理，例如发送到日志服务
-      console.error(`[Bus Error] [${taskId}] ${message}`);
-    },
-    logInfo: (taskId, message) => {
-      // 自定义信息日志处理
-      console.info(`[Bus Info] [${taskId}] ${message}`);
-    },
-  },
-});
-```
-
-**默认行为**：
-
-如果不提供自定义日志回调，总线将使用默认的 console.error 和 console.info。
 
 ## 能力 ID 命名约定
 

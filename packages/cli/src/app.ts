@@ -4,12 +4,10 @@ import {
   taskManager,
   ledger,
   type AgenticOS,
-  type ShellMessage,
+  type ShellEvent,
 } from '@agentic-os/core';
 
 import { loadConfig } from './config.ts';
-
-import type { MessageRequest } from './types.ts';
 
 /**
  * Read messages from stdin in pipe mode
@@ -66,26 +64,22 @@ export const outputError = (error: string): void => {
 export const createAgenticOSInstance = (configPath?: string): AgenticOS => {
   const config = loadConfig(configPath);
   
-  // Message handler for shell output
-  const onMessage = (message: ShellMessage): void => {
-    // Output shell messages to stdout
-    if (message.type === 'content' && message.content) {
-      outputMessage(message.content);
+  // Event handler for shell output
+  const sendShellEvent = (event: ShellEvent): void => {
+    // Output content events to stdout
+    if (event.type === 'content' && event.content) {
+      outputMessage(event.content);
     }
   };
 
   // Create AgenticOS with all modules
   const agenticOS = createAgenticOS({
-    shell: {
-      onMessage,
+    sendShellEvent,
+    logError: (taskId, message) => {
+      outputError(`[${taskId}] ${message}`);
     },
-    bus: {
-      logError: (taskId, message) => {
-        outputError(`[${taskId}] ${message}`);
-      },
-      logInfo: (taskId, message) => {
-        outputError(`[${taskId}] ${message}`);
-      },
+    logInfo: (taskId, message) => {
+      outputError(`[${taskId}] ${message}`);
     },
   })
     .with(modelManager(config.model))
@@ -100,17 +94,22 @@ export const createAgenticOSInstance = (configPath?: string): AgenticOS => {
  */
 export const processMessage = async (
   agenticOS: AgenticOS,
-  message: string
+  message: string,
+  llmConfig: { provider: string; model: string }
 ): Promise<void> => {
   try {
-    const request: MessageRequest = {
+    const request = {
+      userMessageId: `cli-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       message,
+      llmConfig,
     };
 
     const response = await agenticOS.post(request);
     
     // Output task info
-    outputMessage(`[Task ${response.taskId}] Status: ${response.status}`);
+    if (response.routedTasks.length > 0) {
+      outputError(`[Routed to tasks: ${response.routedTasks.join(', ')}]`);
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     outputError(`Error processing message: ${errorMessage}`);
@@ -125,13 +124,33 @@ export const runPipeMode = async (configPath?: string): Promise<void> => {
     // Create AgenticOS instance
     outputError('Initializing Agentic OS...');
     const agenticOS = createAgenticOSInstance(configPath);
+    const config = loadConfig(configPath);
     outputError('✓ Agentic OS ready');
+    
+    // Get default LLM config from model config
+    const defaultProvider = Object.keys(config.model.providers)[0];
+    if (!defaultProvider) {
+      outputError('No model providers configured');
+      process.exit(1);
+    }
+    const providerConfig = config.model.providers[defaultProvider];
+    if (!providerConfig || providerConfig.models.length === 0) {
+      outputError('No models configured for provider');
+      process.exit(1);
+    }
+    const firstModel = providerConfig.models[0];
+    if (!firstModel) {
+      outputError('No models configured for provider');
+      process.exit(1);
+    }
+    const defaultModel = firstModel.name;
+    const llmConfig = { provider: defaultProvider, model: defaultModel };
     
     // Read messages from stdin
     const messageReader = await readPipeMessages();
     
     for await (const input of messageReader) {
-      await processMessage(agenticOS, input);
+      await processMessage(agenticOS, input, llmConfig);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

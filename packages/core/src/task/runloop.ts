@@ -2,9 +2,10 @@
 
 import { v4 as uuidv4 } from 'uuid';
 
+import type { ChatMessage, ToolCall } from '../model/types';
+import type { ContentEvent } from '../shell/types';
 import type { SystemBus, Message, InvokeResult } from '../types';
 import type { TaskRegistry, TaskState } from './types';
-import type { ChatMessage, ToolCall } from '../model/types';
 
 type ToolDefinition = {
   type: 'function';
@@ -38,27 +39,25 @@ const convertToLLMMessages = (messages: Message[]): ChatMessage[] => {
   }));
 };
 
-const streamContentToUser = async (
-  callId: string,
+const streamContentToUser = (
   taskId: string,
   content: string,
   bus: SystemBus
-): Promise<void> => {
+): void => {
   const messageId = generateMessageId();
   const chunkSize = 50; // Characters per chunk
   
   if (content.length === 0) {
     // Send empty message
-    await bus.invoke(
-      'shell:send',
-      callId,
+    const event: ContentEvent = {
+      type: 'content',
       taskId,
-      JSON.stringify({
-        content: '',
-        messageId,
-        index: -1,
-      })
-    );
+      messageId,
+      content: '',
+      index: -1,
+      timestamp: Date.now(),
+    };
+    bus.sendShellEvent(event);
     return;
   }
 
@@ -71,16 +70,18 @@ const streamContentToUser = async (
   // Send all chunks
   for (let i = 0; i < chunks.length; i++) {
     const isLast = i === chunks.length - 1;
-    await bus.invoke(
-      'shell:send',
-      callId,
-      taskId,
-      JSON.stringify({
-        content: chunks[i],
+    const chunk = chunks[i];
+    if (chunk !== undefined) {
+      const event: ContentEvent = {
+        type: 'content',
+        taskId,
         messageId,
+        content: chunk,
         index: isLast ? -1 : i,
-      })
-    );
+        timestamp: Date.now(),
+      };
+      bus.sendShellEvent(event);
+    }
   }
 };
 
@@ -224,7 +225,7 @@ const processLLMResponse = async (
     usage,
   });
 
-  // No need to stream here - model layer already streamed to user via shell:send
+  // No need to stream here - model layer already streamed to user via bus.sendShellEvent
   
   const assistantMessage: Message = {
     id: generateMessageId(),
@@ -274,7 +275,7 @@ const failTask = async (
   taskState.task.updatedAt = Date.now();
 
   unwrapInvokeResult(await bus.invoke('ldg:task:save', callId, 'system', JSON.stringify({ task: taskState.task })));
-  await streamContentToUser(callId, taskId, `Error: ${errorMessage}`, bus);
+  streamContentToUser(taskId, `Error: ${errorMessage}`, bus);
 };
 
 
