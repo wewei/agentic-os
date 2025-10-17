@@ -108,9 +108,17 @@ const logSSEEvent = (event: SSEEvent): void => {
       logInfo(`Task completed: taskId=${event.taskId}`);
       break;
     case 'error':
-      logError(`Error: taskId=${event.taskId || 'unknown'}, code=${event.errorCode}, message=${event.errorMessage}`);
+      logError(`Task error event: taskId=${event.taskId || 'unknown'}, code=${event.errorCode}, message=${event.errorMessage}`);
       break;
-    // Don't log content, ability_request, ability_response to avoid spam
+    case 'ability_request':
+      logInfo(`Ability request: taskId=${event.taskId}, abilityId=${event.abilityId}, callId=${event.callId}`);
+      break;
+    case 'ability_response':
+      if ('result' in event && event.result.type === 'error') {
+        logError(`Ability failed: taskId=${event.taskId}, abilityId=${event.abilityId}, callId=${event.callId}, error=${event.result.error}`);
+      }
+      break;
+    // Don't log content, user_message_routed to avoid spam
   }
 };
 
@@ -299,35 +307,55 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
     request: Request,
     corsHeaders: Record<string, string>
   ): Promise<Response> => {
-    const body = await request.json() as PostMessageRequest;
-    
-    // Log incoming request
-    logInfo(`Received message request: userMessageId=${body.userMessageId}, messageLength=${body.message.length}`);
-    
-    const validation = validatePostMessageRequest(body);
-    if (!validation.valid) {
-      logError(`Request validation failed: ${validation.error}`);
+    try {
+      const body = await request.json() as PostMessageRequest;
+      
+      // Log incoming request
+      logInfo(`Received message request: userMessageId=${body.userMessageId}, messageLength=${body.message.length}`);
+      
+      const validation = validatePostMessageRequest(body);
+      if (!validation.valid) {
+        logError(`Request validation failed: ${validation.error}`);
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Use Core's PostRequest type directly
+      const response = await agenticOS.post(body);
+      
+      logInfo(`Message posted successfully: userMessageId=${body.userMessageId}, routedTasks=${response.routedTasks.join(', ')}`);
+      
       return new Response(
-        JSON.stringify({ error: validation.error }),
+        JSON.stringify(response),
         { 
-          status: 400, 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logError(`Failed to handle send message: ${errorMsg}`);
+      if (errorStack) {
+        logError(`Stack trace: ${errorStack}`);
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to process message',
+          details: errorMsg 
+        }),
+        { 
+          status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
-
-    // Use Core's PostRequest type directly
-    const response = await agenticOS.post(body);
-    
-    logInfo(`Message posted successfully: userMessageId=${body.userMessageId}, routedTasks=${response.routedTasks.join(', ')}`);
-    
-    return new Response(
-      JSON.stringify(response),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
   };
 
   const handleSSE = (
