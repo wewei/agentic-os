@@ -329,7 +329,9 @@ export const createExecuteTask = (registry: TaskRegistry, bus: SystemBus) => {
 
     try {
       const messages = taskState.messages;
-      const tools = await generateToolsFromBus(callId, bus, taskId);
+      // TODO: Load tools from role config instead of auto-generating from all abilities
+      const tools: ToolDefinition[] = [];
+      // const tools = await generateToolsFromBus(callId, bus, taskId);
 
       // Use the LLM config from task state (which may have been updated)
       await runExecutionLoop(callId, taskId, messages, tools, taskState.currentLLMConfig, bus);
