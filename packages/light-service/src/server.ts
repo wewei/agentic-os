@@ -202,12 +202,18 @@ const createSSEStream = (
       const encoder = new TextEncoder();
       
       // Create a pure function that captures the bound enqueue method
+      const enqueue = controller.enqueue.bind(controller);
       const send = (data: Uint8Array): boolean => {
         try {
-          controller.enqueue(data);
+          enqueue(data);
           return true;
         } catch (error) {
-          console.error('Failed to send data:', error);
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          logError(`Failed to send SSE data: ${errorMsg}`);
+          if (errorStack) {
+            logError(`Stack: ${errorStack}`);
+          }
           return false;
         }
       };

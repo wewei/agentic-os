@@ -8,9 +8,8 @@ import type {
   UIState, 
   Message, 
   Task, 
-  LLMConfig, 
-  TaskModelConfig, 
-  ShellMessage 
+  TaskModelConfig,
+  SSEEvent,
 } from '@/lib/messageService';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,16 +29,20 @@ const createInitialState = (): UIState => ({
 });
 
 const handleTaskUpdate = (
-  shellMessage: ShellMessage,
+  event: SSEEvent,
   tasks: Task[]
 ): Task[] => {
-  const taskIndex = tasks.findIndex(t => t.id === shellMessage.taskId);
+  if (event.type !== 'task_started' && event.type !== 'task_completed') {
+    return tasks;
+  }
+  
+  const taskIndex = tasks.findIndex(t => t.id === event.taskId);
   const updatedTask: Task = {
-    id: shellMessage.taskId,
-    name: shellMessage.taskName || `Task ${shellMessage.taskId.slice(0, 8)}`,
-    isComplete: shellMessage.isComplete || false,
-    createdAt: shellMessage.createdAt || Date.now(),
-    updatedAt: shellMessage.updatedAt || Date.now(),
+    id: event.taskId,
+    name: event.type === 'task_started' ? event.taskName : `Task ${event.taskId.slice(0, 8)}`,
+    isComplete: event.type === 'task_completed',
+    createdAt: event.timestamp,
+    updatedAt: event.timestamp,
   };
 
   if (taskIndex >= 0) {
@@ -51,60 +54,63 @@ const handleTaskUpdate = (
 };
 
 const handleContentMessage = (
-  shellMessage: ShellMessage,
+  event: SSEEvent,
   messages: Message[]
 ): Message[] => {
-  const messageId = shellMessage.messageId || `msg-${Date.now()}`;
+  if (event.type !== 'content') {
+    return messages;
+  }
+  
+  const messageId = event.messageId;
   const existingIndex = messages.findIndex(m => m.id === messageId);
 
   if (existingIndex >= 0) {
     const updatedMessages = [...messages];
     updatedMessages[existingIndex] = {
       ...updatedMessages[existingIndex],
-      content: updatedMessages[existingIndex].content + (shellMessage.content || ''),
-      sentAt: Date.now(),
+      content: updatedMessages[existingIndex].content + event.content,
+      sentAt: event.timestamp,
     };
     return updatedMessages;
   }
 
   const newMessage: Message = {
     id: messageId,
-    taskId: shellMessage.taskId,
+    taskId: event.taskId,
     type: 'agent',
-    content: shellMessage.content || '',
-    sentAt: Date.now(),
+    content: event.content,
+    sentAt: event.timestamp,
   };
   return [...messages, newMessage];
 };
 
-const processShellMessage = (
-  shellMessage: ShellMessage, 
+const processSSEEvent = (
+  event: SSEEvent, 
   state: UIState
 ): Partial<UIState> => {
   const updates: Partial<UIState> = {};
 
-  if (shellMessage.type === 'connection') {
-    console.log('SSE connection confirmed:', shellMessage.content);
-    return updates;
-  }
-
-  if (shellMessage.type === 'task_update' || shellMessage.type === 'start') {
-    updates.tasks = handleTaskUpdate(shellMessage, state.tasks);
-  }
-
-  if (shellMessage.type === 'content' && shellMessage.content) {
-    updates.messages = handleContentMessage(shellMessage, state.messages);
-  }
-
-  if (shellMessage.type === 'user' && shellMessage.content) {
-    const newMessage: Message = {
-      id: `user-${Date.now()}`,
-      taskId: shellMessage.taskId,
-      type: 'user',
-      content: shellMessage.content,
-      sentAt: Date.now(),
-    };
-    updates.messages = [...state.messages, newMessage];
+  switch (event.type) {
+    case 'task_started':
+    case 'task_completed':
+      updates.tasks = handleTaskUpdate(event, state.tasks);
+      break;
+    
+    case 'content':
+      updates.messages = handleContentMessage(event, state.messages);
+      break;
+    
+    case 'error':
+      // Display error message
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        taskId: event.taskId || 'unknown',
+        type: 'agent',
+        content: `Error: ${event.errorMessage}`,
+        sentAt: event.timestamp,
+      };
+      updates.messages = [...state.messages, errorMessage];
+      break;
   }
 
   return updates;
@@ -151,16 +157,16 @@ const App: React.FC = () => {
 
       eventSource.onmessage = (event) => {
         try {
-          const shellMessage = JSON.parse(event.data) as ShellMessage;
-          console.log('Received SSE message:', shellMessage.type, shellMessage);
+          const sseEvent = JSON.parse(event.data) as SSEEvent;
+          console.log('Received SSE event:', sseEvent.type, sseEvent);
           
           setState(prevState => {
-            const updates = processShellMessage(shellMessage, prevState);
-            console.log('SSE updates:', updates);
-            console.log('Previous state messages:', prevState.messages.length);
-            const newState = { ...prevState, ...updates };
-            console.log('New state messages:', newState.messages.length);
-            return newState;
+            const updates = processSSEEvent(sseEvent, prevState);
+            if (Object.keys(updates).length > 0) {
+              console.log('SSE updates:', updates);
+              return { ...prevState, ...updates };
+            }
+            return prevState;
           });
         } catch (error) {
           console.error('Error parsing SSE message:', error);

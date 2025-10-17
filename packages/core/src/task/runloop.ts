@@ -135,10 +135,46 @@ const executeToolCall = async (
   messages: Message[],
   bus: SystemBus
 ): Promise<void> => {
-  const abilityId = toolCall.function.name.replace('_', ':');
-  const args = toolCall.function.arguments;
+  // Validate tool call
+  if (!toolCall.function?.name) {
+    console.error(`Task ${taskId} - Invalid tool call: missing function name`, toolCall);
+    const errorMsg: Message = {
+      id: generateMessageId(),
+      taskId,
+      role: 'assistant',
+      content: `Tool call failed: missing function name`,
+      timestamp: Date.now(),
+    };
+    unwrapInvokeResult(await bus.invoke('ldg:msg:save', callId, 'system', JSON.stringify({ message: errorMsg })));
+    messages.push(errorMsg);
+    return;
+  }
+
+  const abilityId = toolCall.function.name.replace(/_/g, ':');
+  const args = toolCall.function.arguments || '{}';
 
   console.log(`Task ${taskId} - Executing tool: ${abilityId}`);
+  console.log(`Task ${taskId} - Tool arguments: ${args.substring(0, 200)}${args.length > 200 ? '...' : ''}`);
+
+  // Validate JSON arguments
+  try {
+    JSON.parse(args);
+  } catch (error) {
+    const errorMessage = `Invalid JSON arguments: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`Task ${taskId} - ${errorMessage}`);
+    console.error(`Task ${taskId} - Raw arguments:`, args);
+    
+    const errorMsg: Message = {
+      id: generateMessageId(),
+      taskId,
+      role: 'assistant',
+      content: `Tool ${abilityId} failed: ${errorMessage}`,
+      timestamp: Date.now(),
+    };
+    unwrapInvokeResult(await bus.invoke('ldg:msg:save', callId, 'system', JSON.stringify({ message: errorMsg })));
+    messages.push(errorMsg);
+    return;
+  }
 
   try {
     const toolResult = unwrapInvokeResult(await bus.invoke(abilityId, callId, taskId, args));
