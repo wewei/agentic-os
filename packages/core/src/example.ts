@@ -114,67 +114,73 @@ const createSSEStream = (taskId?: string): ReadableStream => {
 };
 
 // HTTP Server
+const createCorsResponse = (): Response => {
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+};
+
+const handleSendRequest = async (req: Request, agenticOS: AgenticOS): Promise<Response> => {
+  try {
+    const body = await req.json() as { 
+      userMessageId: string;
+      message: string; 
+      llmConfig: { provider: string; model: string };
+      relatedTaskIds?: string[];
+    };
+    const result = await agenticOS.post(body);
+    return Response.json(result);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Response.json(
+      { error: { code: 'INTERNAL_ERROR', message: errorMessage } },
+      { status: 500 }
+    );
+  }
+};
+
+const handleStreamRequest = (pathname: string): Response => {
+  const parts = pathname.split('/stream/');
+  const taskId = parts[1] || undefined;
+  const stream = createSSEStream(taskId);
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+};
+
 const createHTTPServer = (agenticOS: AgenticOS, port: number): Server<undefined> => {
   const fetchHandler = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
 
-    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      });
+      return createCorsResponse();
     }
 
-    // POST /send
     if (url.pathname === '/send' && req.method === 'POST') {
-      try {
-        const body = await req.json() as { 
-          userMessageId: string;
-          message: string; 
-          llmConfig: { provider: string; model: string };
-          relatedTaskIds?: string[];
-        };
-        const result = await agenticOS.post(body);
-        return Response.json(result);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return Response.json(
-          { error: { code: 'INTERNAL_ERROR', message: errorMessage } },
-          { status: 500 }
-        );
-      }
+      return handleSendRequest(req, agenticOS);
     }
 
-    // GET /stream or /stream/:taskId
     if (url.pathname.startsWith('/stream') && req.method === 'GET') {
-      const parts = url.pathname.split('/stream/');
-      const taskId = parts[1] || undefined;
-      const stream = createSSEStream(taskId);
-
-      return new Response(stream, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
+      return handleStreamRequest(url.pathname);
     }
 
-    // 404
     return Response.json({ error: 'Not found' }, { status: 404 });
   };
 
-  const server = Bun.serve({
+  return Bun.serve({
     port,
     fetch: fetchHandler,
   });
-
-  return server;
 };
 
 // Main

@@ -7,7 +7,6 @@ import { logInfo, logError } from './logger';
 import type { 
   AgenticConfig, 
   PostMessageRequest, 
-  PostMessageResponse,
   SSEConnection,
   SSEEvent,
 } from './types';
@@ -85,11 +84,8 @@ const sendSSEEvent = (
   try {
     const data = `data: ${JSON.stringify(event)}\n\n`;
     const encoder = new TextEncoder();
-    const success = connection.send(encoder.encode(data));
-    if (!success) {
-      connection.isActive = false;
-    }
-    return success;
+    connection.controller.enqueue(encoder.encode(data));
+    return true;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     const taskId = 'taskId' in event ? event.taskId : 'unknown';
@@ -135,9 +131,10 @@ const createMessageHandler = (
     // Forward to specific task connection
     if (taskId) {
       const connection = sseConnections.get(taskId);
-      if (connection && connection.isActive) {
-        if (!sendSSEEvent(connection, event)) {
+      if (connection) {
+        if (!connection.isActive || !sendSSEEvent(connection, event)) {
           sseConnections.delete(taskId);
+          logInfo(`Cleaned up inactive SSE connection: taskId=${taskId}`);
         }
       }
     }
@@ -145,9 +142,10 @@ const createMessageHandler = (
     // Forward to all global connections (iterate backwards to safely remove)
     for (let i = globalConnections.length - 1; i >= 0; i--) {
       const conn = globalConnections[i];
-      if (conn && conn.isActive) {
-        if (!sendSSEEvent(conn, event)) {
+      if (conn) {
+        if (!conn.isActive || !sendSSEEvent(conn, event)) {
           globalConnections.splice(i, 1);
+          logInfo('Cleaned up inactive global SSE connection');
         }
       }
     }
@@ -190,6 +188,25 @@ const unregisterSSEConnection = (
   }
 };
 
+const sendInitialSSEMessage = (
+  taskId: string | undefined, 
+  controller: ReadableStreamDefaultController
+): void => {
+  try {
+    const encoder = new TextEncoder();
+    const initMessage = {
+      type: 'connection',
+      taskId: taskId || 'all',
+      content: taskId 
+        ? `Connected to message stream for task: ${taskId}` 
+        : 'Connected to global message stream',
+    };
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(initMessage)}\n\n`));
+  } catch (error) {
+    logError(`Failed to send initial SSE message: ${error}`);
+  }
+};
+
 const createSSEStream = (
   taskId: string | undefined,
   sseConnections: Map<string, SSEConnection>,
@@ -200,45 +217,29 @@ const createSSEStream = (
   return new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
-      
-      // Create a pure function that captures the bound enqueue method
-      const enqueue = controller.enqueue.bind(controller);
-      const send = (data: Uint8Array): boolean => {
-        try {
-          enqueue(data);
-          return true;
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          const errorStack = error instanceof Error ? error.stack : undefined;
-          logError(`Failed to send SSE data: ${errorMsg}`);
-          if (errorStack) {
-            logError(`Stack: ${errorStack}`);
-          }
-          return false;
-        }
-      };
 
-      const initMessage = {
-        type: 'connection',
-        taskId: taskId || 'all',
-        content: taskId 
-          ? `Connected to message stream for task: ${taskId}` 
-          : 'Connected to global message stream',
-      };
-      send(encoder.encode(`data: ${JSON.stringify(initMessage)}\n\n`));
+      sendInitialSSEMessage(taskId, controller);
 
       const connection: SSEConnection = {
         taskId: taskId || '',
-        send,
+        controller,
         isActive: true,
       };
 
       registerSSEConnection(taskId, connection, sseConnections, globalConnections);
 
-      // Send keep-alive comments every 30 seconds to prevent timeout
       keepAliveInterval = setInterval(() => {
         if (connection.isActive) {
-          send(encoder.encode(': keep-alive\n\n'));
+          try {
+            controller.enqueue(encoder.encode(': keep-alive\n\n'));
+          } catch (error) {
+            logError(`Keep-alive failed: ${error}`);
+            connection.isActive = false;
+            if (keepAliveInterval) {
+              clearInterval(keepAliveInterval);
+              keepAliveInterval = null;
+            }
+          }
         }
       }, 30000);
     },

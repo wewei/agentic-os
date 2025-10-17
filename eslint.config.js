@@ -94,6 +94,7 @@ export default tseslint.config(
       'dist/**',
       'build/**',
       '*.config.js',
+      '**/*.config.cjs',
       'packages/*/node_modules/**',
       'packages/*/dist/**',
       'packages/*/build/**',

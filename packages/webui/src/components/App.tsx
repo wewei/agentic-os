@@ -100,7 +100,7 @@ const processSSEEvent = (
       updates.messages = handleContentMessage(event, state.messages);
       break;
     
-    case 'error':
+    case 'error': {
       // Display error message
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
@@ -111,6 +111,7 @@ const processSSEEvent = (
       };
       updates.messages = [...state.messages, errorMessage];
       break;
+    }
   }
 
   return updates;

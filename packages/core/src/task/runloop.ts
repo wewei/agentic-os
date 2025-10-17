@@ -84,48 +84,92 @@ const streamContentToUser = async (
   }
 };
 
-const generateToolsFromBus = async (callId: string, bus: SystemBus, taskId: string): Promise<ToolDefinition[]> => {
-  // Get all modules
-  const modulesResult = unwrapInvokeResult(await bus.invoke('bus:list', callId, taskId, '{}'));
-  const { modules } = JSON.parse(modulesResult);
+// const generateToolsFromBus = async (callId: string, bus: SystemBus, taskId: string): Promise<ToolDefinition[]> => {
+//   // Get all modules
+//   const modulesResult = unwrapInvokeResult(await bus.invoke('bus:list', callId, taskId, '{}'));
+//   const { modules } = JSON.parse(modulesResult);
 
-  const tools: ToolDefinition[] = [];
+//   const tools: ToolDefinition[] = [];
 
-  for (const module of modules) {
-    // Skip bus and shell modules from tools
-    if (module.name === 'bus' || module.name === 'shell') {
-      continue;
-    }
+//   for (const module of modules) {
+//     // Skip bus and shell modules from tools
+//     if (module.name === 'bus' || module.name === 'shell') {
+//       continue;
+//     }
 
-    const abilitiesResult = unwrapInvokeResult(await bus.invoke(
-      'bus:abilities',
-      callId,
-      taskId,
-      JSON.stringify({ moduleName: module.name })
-    ));
-    const { abilities } = JSON.parse(abilitiesResult);
+//     const abilitiesResult = unwrapInvokeResult(await bus.invoke(
+//       'bus:abilities',
+//       callId,
+//       taskId,
+//       JSON.stringify({ moduleName: module.name })
+//     ));
+//     const { abilities } = JSON.parse(abilitiesResult);
 
-    for (const ability of abilities) {
-      const schemaResult = unwrapInvokeResult(await bus.invoke(
-        'bus:schema',
-        callId,
-        taskId,
-        JSON.stringify({ abilityId: ability.id })
-      ));
-      const { inputSchema } = JSON.parse(schemaResult);
+//     for (const ability of abilities) {
+//       const schemaResult = unwrapInvokeResult(await bus.invoke(
+//         'bus:schema',
+//         callId,
+//         taskId,
+//         JSON.stringify({ abilityId: ability.id })
+//       ));
+//       const { inputSchema } = JSON.parse(schemaResult);
 
-      tools.push({
-        type: 'function',
-        function: {
-          name: ability.id.replace(':', '_'), // 'task:spawn' -> 'task_spawn'
-          description: ability.description,
-          parameters: inputSchema,
-        },
-      });
-    }
+//       tools.push({
+//         type: 'function',
+//         function: {
+//           name: ability.id.replace(':', '_'), // 'task:spawn' -> 'task_spawn'
+//           description: ability.description,
+//           parameters: inputSchema,
+//         },
+//       });
+//     }
+//   }
+
+//   return tools;
+// };
+
+const saveErrorMessage = async (
+  callId: string,
+  taskId: string,
+  content: string,
+  messages: Message[],
+  bus: SystemBus
+): Promise<void> => {
+  const errorMsg: Message = {
+    id: generateMessageId(),
+    taskId,
+    role: 'assistant',
+    content,
+    timestamp: Date.now(),
+  };
+  unwrapInvokeResult(await bus.invoke('ldg:msg:save', callId, 'system', JSON.stringify({ message: errorMsg })));
+  messages.push(errorMsg);
+};
+
+const validateAndPrepareToolCall = (
+  toolCall: ToolCall,
+  taskId: string
+): { valid: false } | { valid: true; abilityId: string; args: string } => {
+  if (!toolCall.function?.name) {
+    console.error(`Task ${taskId} - Invalid tool call: missing function name`, toolCall);
+    return { valid: false };
   }
 
-  return tools;
+  const abilityId = toolCall.function.name.replace(/_/g, ':');
+  const args = toolCall.function.arguments || '{}';
+
+  console.log(`Task ${taskId} - Executing tool: ${abilityId}`);
+  console.log(`Task ${taskId} - Tool arguments: ${args.substring(0, 200)}${args.length > 200 ? '...' : ''}`);
+
+  try {
+    JSON.parse(args);
+    return { valid: true, abilityId, args };
+  } catch (error) {
+    const errorMessage = `Invalid JSON arguments: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`Task ${taskId} - ${errorMessage}`);
+    console.error(`Task ${taskId} - Raw arguments:`, args);
+    return { valid: false };
+  }
 };
 
 const executeToolCall = async (
@@ -135,46 +179,14 @@ const executeToolCall = async (
   messages: Message[],
   bus: SystemBus
 ): Promise<void> => {
-  // Validate tool call
-  if (!toolCall.function?.name) {
-    console.error(`Task ${taskId} - Invalid tool call: missing function name`, toolCall);
-    const errorMsg: Message = {
-      id: generateMessageId(),
-      taskId,
-      role: 'assistant',
-      content: `Tool call failed: missing function name`,
-      timestamp: Date.now(),
-    };
-    unwrapInvokeResult(await bus.invoke('ldg:msg:save', callId, 'system', JSON.stringify({ message: errorMsg })));
-    messages.push(errorMsg);
+  const validation = validateAndPrepareToolCall(toolCall, taskId);
+  
+  if (!validation.valid) {
+    await saveErrorMessage(callId, taskId, 'Tool call failed: invalid tool call', messages, bus);
     return;
   }
 
-  const abilityId = toolCall.function.name.replace(/_/g, ':');
-  const args = toolCall.function.arguments || '{}';
-
-  console.log(`Task ${taskId} - Executing tool: ${abilityId}`);
-  console.log(`Task ${taskId} - Tool arguments: ${args.substring(0, 200)}${args.length > 200 ? '...' : ''}`);
-
-  // Validate JSON arguments
-  try {
-    JSON.parse(args);
-  } catch (error) {
-    const errorMessage = `Invalid JSON arguments: ${error instanceof Error ? error.message : String(error)}`;
-    console.error(`Task ${taskId} - ${errorMessage}`);
-    console.error(`Task ${taskId} - Raw arguments:`, args);
-    
-    const errorMsg: Message = {
-      id: generateMessageId(),
-      taskId,
-      role: 'assistant',
-      content: `Tool ${abilityId} failed: ${errorMessage}`,
-      timestamp: Date.now(),
-    };
-    unwrapInvokeResult(await bus.invoke('ldg:msg:save', callId, 'system', JSON.stringify({ message: errorMsg })));
-    messages.push(errorMsg);
-    return;
-  }
+  const { abilityId, args } = validation;
 
   try {
     const toolResult = unwrapInvokeResult(await bus.invoke(abilityId, callId, taskId, args));
@@ -193,17 +205,7 @@ const executeToolCall = async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`Task ${taskId} - Tool execution failed:`, errorMessage);
-
-    const errorMsg: Message = {
-      id: generateMessageId(),
-      taskId,
-      role: 'assistant',
-      content: `Tool ${abilityId} failed: ${errorMessage}`,
-      timestamp: Date.now(),
-    };
-
-    unwrapInvokeResult(await bus.invoke('ldg:msg:save', callId, 'system', JSON.stringify({ message: errorMsg })));
-    messages.push(errorMsg);
+    await saveErrorMessage(callId, taskId, `Tool ${abilityId} failed: ${errorMessage}`, messages, bus);
   }
 };
 

@@ -1,9 +1,9 @@
 // Agentic OS - Main Entry Point
 
 import { createSystemBus } from './bus';
-import type { BusLogCallbacks } from './bus';
 import { shell } from './shell';
 
+import type { BusLogCallbacks } from './bus';
 import type { ShellConfig, PostRequest, PostResponse } from './shell/types';
 import type { TaskModelConfig } from './task';
 import type { Module, SystemBus } from './types';

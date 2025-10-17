@@ -1,6 +1,16 @@
 // Message service for WebUI frontend
 
 // Re-export event types from Core
+// Re-import for local use
+import type {
+  ShellEvent as SSEEvent,
+  PostRequest,
+  PostResponse,
+  LLMConfig,
+  TaskModelConfig,
+  InvokeResult,
+} from '@agentic-os/core';
+
 export type {
   ShellEvent as SSEEvent,
   TaskStartedEvent,
@@ -14,16 +24,6 @@ export type {
   PostResponse,
   LLMConfig,
   TaskModelConfig,
-} from '@agentic-os/core';
-
-// Re-import for local use
-import type {
-  ShellEvent as SSEEvent,
-  PostRequest,
-  PostResponse,
-  LLMConfig,
-  TaskModelConfig,
-  InvokeResult,
 } from '@agentic-os/core';
 
 export type Message = {
