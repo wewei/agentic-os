@@ -222,25 +222,23 @@ const App: React.FC = () => {
         return newState;
       });
 
-      // Prepare LLM config if this is a new task
-      let llmConfig: LLMConfig | undefined;
-      if (!currentTaskId && state.llmConfig.provider && state.llmConfig.model) {
-        llmConfig = state.llmConfig;
-      }
+      // Prepare relatedTaskIds array
+      const relatedTaskIds = currentTaskId ? [currentTaskId] : [];
 
-      // Send to backend
-      const response = await sendMessage(message, currentTaskId || undefined, llmConfig);
+      // Send to backend with llmConfig and relatedTaskIds
+      const response = await sendMessage(message, state.llmConfig, relatedTaskIds);
       console.log('Backend response:', response);
       
       // Update task ID if this is a new conversation
-      if (!currentTaskId) {
-        setCurrentTaskId(response.taskId);
+      if (!currentTaskId && response.routedTasks && response.routedTasks.length > 0) {
+        const taskId = response.routedTasks[0];
+        setCurrentTaskId(taskId);
         
         // Update the user message with the correct task ID
         setState(prev => ({
           ...prev,
           messages: prev.messages.map(m => 
-            m.id === userMessageId ? { ...m, taskId: response.taskId } : m
+            m.id === userMessageId ? { ...m, taskId } : m
           ),
         }));
       }

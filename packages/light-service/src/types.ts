@@ -42,7 +42,7 @@ export type PostMessageResponse = import('@agentic-os/core').PostResponse;
 
 export type SSEConnection = {
   taskId: string;
-  controller: ReadableStreamDefaultController;
+  send: (data: Uint8Array) => boolean;
   isActive: boolean;
 };
 

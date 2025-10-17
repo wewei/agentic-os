@@ -84,8 +84,12 @@ const sendSSEEvent = (
 
   try {
     const data = `data: ${JSON.stringify(event)}\n\n`;
-    connection.controller.enqueue(new TextEncoder().encode(data));
-    return true;
+    const encoder = new TextEncoder();
+    const success = connection.send(encoder.encode(data));
+    if (!success) {
+      connection.isActive = false;
+    }
+    return success;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     const taskId = 'taskId' in event ? event.taskId : 'unknown';
@@ -187,6 +191,19 @@ const createSSEStream = (
   
   return new ReadableStream({
     start(controller) {
+      const encoder = new TextEncoder();
+      
+      // Create a pure function that captures the bound enqueue method
+      const send = (data: Uint8Array): boolean => {
+        try {
+          controller.enqueue(data);
+          return true;
+        } catch (error) {
+          console.error('Failed to send data:', error);
+          return false;
+        }
+      };
+
       const initMessage = {
         type: 'connection',
         taskId: taskId || 'all',
@@ -194,13 +211,11 @@ const createSSEStream = (
           ? `Connected to message stream for task: ${taskId}` 
           : 'Connected to global message stream',
       };
-      controller.enqueue(
-        new TextEncoder().encode(`data: ${JSON.stringify(initMessage)}\n\n`)
-      );
+      send(encoder.encode(`data: ${JSON.stringify(initMessage)}\n\n`));
 
       const connection: SSEConnection = {
         taskId: taskId || '',
-        controller,
+        send,
         isActive: true,
       };
 
@@ -209,12 +224,7 @@ const createSSEStream = (
       // Send keep-alive comments every 30 seconds to prevent timeout
       keepAliveInterval = setInterval(() => {
         if (connection.isActive) {
-          try {
-            controller.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
-          } catch (error) {
-            console.error('Keep-alive failed:', error);
-            if (keepAliveInterval) clearInterval(keepAliveInterval);
-          }
+          send(encoder.encode(': keep-alive\n\n'));
         }
       }, 30000);
     },
