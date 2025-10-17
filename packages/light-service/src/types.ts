@@ -1,6 +1,7 @@
 // Types for Light Service
 
 import type { ModelManagerConfig, TaskManagerConfig } from '@agentic-os/core';
+import type { Session } from 'better-sse';
 
 // Re-export event types from Core
 export type {
@@ -42,7 +43,6 @@ export type PostMessageResponse = import('@agentic-os/core').PostResponse;
 
 export type SSEConnection = {
   taskId: string;
-  controller: ReadableStreamDefaultController;
-  isActive: boolean;
+  session: Session;
 };
 

@@ -35,6 +35,8 @@
   },
   "dependencies": {
     "@agentic-os/core": "workspace:*",
+    "better-sse": "^0.15.1",
+    "express": "^5.1.0",
     "js-yaml": "^4.1.0",
     "zod": "^4.1.12"
   },
@@ -42,6 +44,7 @@
     "@eslint/js": "^9.15.0",
     "@types/bun": "latest",
     "@types/eslint__js": "^8.42.3",
+    "@types/express": "^5.0.3",
     "@types/js-yaml": "^4.0.9",
     "eslint": "^9.15.0",
     "eslint-plugin-import": "^2.31.0",
@@ -67,5 +70,3 @@
     "directory": "packages/light-service"
   }
 }
-
-

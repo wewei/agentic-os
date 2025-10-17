@@ -1,6 +1,8 @@
 // Light Service Backend Server
 
 import { createAgenticOS, ledger, modelManager, taskManager } from '@agentic-os/core';
+import { createSession } from 'better-sse';
+import express from 'express';
 
 import { logInfo, logError } from './logger';
 
@@ -10,6 +12,7 @@ import type {
   SSEConnection,
   SSEEvent,
 } from './types';
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 
 export type LightServer = {
   start: () => Promise<void>;
@@ -73,24 +76,18 @@ const validatePostMessageRequest = (body: PostMessageRequest): ValidationResult 
   return { valid: true };
 };
 
-const sendSSEEvent = (
-  connection: SSEConnection,
-  event: SSEEvent
-): boolean => {
-  if (!connection.isActive) {
+const sendSSEEvent = (connection: SSEConnection, event: SSEEvent): boolean => {
+  if (!connection.session.isConnected) {
     return false;
   }
 
   try {
-    const data = `data: ${JSON.stringify(event)}\n\n`;
-    const encoder = new TextEncoder();
-    connection.controller.enqueue(encoder.encode(data));
+    connection.session.push(event);
     return true;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     const taskId = 'taskId' in event ? event.taskId : 'unknown';
     logError(`Error sending SSE event (taskId=${taskId}, type=${event.type}): ${errorMsg}`);
-    connection.isActive = false;
     return false;
   }
 };
@@ -125,132 +122,26 @@ const createMessageHandler = (
   return (event: SSEEvent) => {
     logSSEEvent(event);
     
-    // Extract taskId from event (different events have it in different places)
     const taskId = 'taskId' in event ? event.taskId : '';
     
-    // Forward to specific task connection
     if (taskId) {
       const connection = sseConnections.get(taskId);
       if (connection) {
-        if (!connection.isActive || !sendSSEEvent(connection, event)) {
+        if (!sendSSEEvent(connection, event)) {
           sseConnections.delete(taskId);
           logInfo(`Cleaned up inactive SSE connection: taskId=${taskId}`);
         }
       }
     }
     
-    // Forward to all global connections (iterate backwards to safely remove)
     for (let i = globalConnections.length - 1; i >= 0; i--) {
       const conn = globalConnections[i];
-      if (conn) {
-        if (!conn.isActive || !sendSSEEvent(conn, event)) {
-          globalConnections.splice(i, 1);
-          logInfo('Cleaned up inactive global SSE connection');
-        }
+      if (conn && !sendSSEEvent(conn, event)) {
+        globalConnections.splice(i, 1);
+        logInfo('Cleaned up inactive global SSE connection');
       }
     }
   };
-};
-
-const registerSSEConnection = (
-  taskId: string | undefined,
-  connection: SSEConnection,
-  sseConnections: Map<string, SSEConnection>,
-  globalConnections: SSEConnection[]
-): void => {
-  if (taskId) {
-    sseConnections.set(taskId, connection);
-    logInfo(`SSE connection established: taskId=${taskId}`);
-  } else {
-    globalConnections.push(connection);
-    logInfo('SSE global connection established');
-  }
-};
-
-const unregisterSSEConnection = (
-  taskId: string | undefined,
-  sseConnections: Map<string, SSEConnection>,
-  globalConnections: SSEConnection[]
-): void => {
-  if (taskId) {
-    const conn = sseConnections.get(taskId);
-    if (conn) {
-      conn.isActive = false;
-      sseConnections.delete(taskId);
-      logInfo(`SSE connection closed: taskId=${taskId}`);
-    }
-  } else {
-    const index = globalConnections.findIndex(c => !c.isActive);
-    if (index !== -1) {
-      globalConnections.splice(index, 1);
-      logInfo('SSE global connection closed');
-    }
-  }
-};
-
-const sendInitialSSEMessage = (
-  taskId: string | undefined, 
-  controller: ReadableStreamDefaultController
-): void => {
-  try {
-    const encoder = new TextEncoder();
-    const initMessage = {
-      type: 'connection',
-      taskId: taskId || 'all',
-      content: taskId 
-        ? `Connected to message stream for task: ${taskId}` 
-        : 'Connected to global message stream',
-    };
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(initMessage)}\n\n`));
-  } catch (error) {
-    logError(`Failed to send initial SSE message: ${error}`);
-  }
-};
-
-const createSSEStream = (
-  taskId: string | undefined,
-  sseConnections: Map<string, SSEConnection>,
-  globalConnections: SSEConnection[]
-): ReadableStream => {
-  let keepAliveInterval: Timer | null = null;
-  
-  return new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-
-      sendInitialSSEMessage(taskId, controller);
-
-      const connection: SSEConnection = {
-        taskId: taskId || '',
-        controller,
-        isActive: true,
-      };
-
-      registerSSEConnection(taskId, connection, sseConnections, globalConnections);
-
-      keepAliveInterval = setInterval(() => {
-        if (connection.isActive) {
-          try {
-            controller.enqueue(encoder.encode(': keep-alive\n\n'));
-          } catch (error) {
-            logError(`Keep-alive failed: ${error}`);
-            connection.isActive = false;
-            if (keepAliveInterval) {
-              clearInterval(keepAliveInterval);
-              keepAliveInterval = null;
-            }
-          }
-        }
-      }, 30000);
-    },
-    cancel() {
-      if (keepAliveInterval) {
-        clearInterval(keepAliveInterval);
-        keepAliveInterval = null;
-      }
-      unregisterSSEConnection(taskId, sseConnections, globalConnections);
-    },
-  });
 };
 
 // eslint-disable-next-line max-lines-per-function
@@ -262,11 +153,9 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
   const corsOrigin = endpointConfig.cors?.origin || '*';
   const corsCredentials = endpointConfig.cors?.credentials || false;
   
-  // Track active SSE connections
   const sseConnections = new Map<string, SSEConnection>();
   const globalConnections: SSEConnection[] = [];
   
-  // Initialize AgenticOS with all modules
   const agenticOS = createAgenticOS({
     shell: {
       onMessage: createMessageHandler(sseConnections, globalConnections),
@@ -284,74 +173,42 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
     .with(modelManager(agenticConfig.model ?? { providers: {} }))
     .with(taskManager(agenticConfig.task ?? {}));
 
-  const server = Bun.serve({
-    port,
-    hostname: host,
-    async fetch(request) {
-      const url = new URL(request.url);
-      const path = url.pathname;
+  const app = express();
 
-      // Add CORS headers
-      const corsHeaders: Record<string, string> = {
-        'Access-Control-Allow-Origin': Array.isArray(corsOrigin) ? corsOrigin.join(', ') : corsOrigin,
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Credentials': corsCredentials ? 'true' : 'false',
-      };
-
-      // Handle preflight requests
-      if (request.method === 'OPTIONS') {
-        return new Response(null, { status: 200, headers: corsHeaders });
-      }
-
-      // API routes under /{basePath}/
-      const apiPrefix = `/${basePath}`;
-      if (path.startsWith(apiPrefix)) {
-        return handleApiRequest(request, path, apiPrefix, corsHeaders);
-      }
-
-      // 404 for unknown routes
-      return new Response('Not found', { 
-        status: 404, 
-        headers: corsHeaders 
-      });
-    },
+  // CORS middleware
+  app.use((req, res, next) => {
+    const origin = Array.isArray(corsOrigin) ? corsOrigin.join(', ') : corsOrigin;
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Credentials', corsCredentials ? 'true' : 'false');
+    
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
   });
 
-  const handleSendMessage = async (
-    request: Request,
-    corsHeaders: Record<string, string>
-  ): Promise<Response> => {
+  app.use(express.json());
+
+  // POST /api/send
+  app.post(`/${basePath}/send`, async (req: ExpressRequest, res: ExpressResponse) => {
     try {
-      const body = await request.json() as PostMessageRequest;
+      const body = req.body as PostMessageRequest;
       
-      // Log incoming request
-      logInfo(`Received message request: userMessageId=${body.userMessageId}, messageLength=${body.message.length}`);
+      logInfo(`Received message request: userMessageId=${body.userMessageId}, messageLength=${body.message?.length || 0}`);
       
       const validation = validatePostMessageRequest(body);
       if (!validation.valid) {
         logError(`Request validation failed: ${validation.error}`);
-        return new Response(
-          JSON.stringify({ error: validation.error }),
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
+        return res.status(400).json({ error: validation.error });
       }
 
-      // Use Core's PostRequest type directly
       const response = await agenticOS.post(body);
       
       logInfo(`Message posted successfully: userMessageId=${body.userMessageId}, routedTasks=${response.routedTasks.join(', ')}`);
       
-      return new Response(
-        JSON.stringify(response),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return res.json(response);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
@@ -360,138 +217,120 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
         logError(`Stack trace: ${errorStack}`);
       }
       
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to process message',
-          details: errorMsg 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      return res.status(500).json({ 
+        error: 'Failed to process message',
+        details: errorMsg 
+      });
+    }
+  });
+
+  // SSE handler function
+  const handleSSE = async (req: ExpressRequest, res: ExpressResponse) => {
+    const taskId = req.params.taskId;
+    
+    try {
+      const session = await createSession(req, res);
+
+      const connection: SSEConnection = {
+        taskId: taskId || '',
+        session,
+      };
+
+      // Register connection immediately
+      if (taskId) {
+        sseConnections.set(taskId, connection);
+        logInfo(`SSE connection established: taskId=${taskId}`);
+      } else {
+        globalConnections.push(connection);
+        logInfo('SSE global connection established');
+      }
+
+      // Send initial connection message
+      session.push({
+        type: 'connection',
+        taskId: taskId || 'all',
+        content: taskId 
+          ? `Connected to message stream for task: ${taskId}` 
+          : 'Connected to global message stream',
+      });
+
+      // Cleanup on disconnect
+      session.on('disconnected', () => {
+        if (taskId) {
+          sseConnections.delete(taskId);
+          logInfo(`SSE connection closed: taskId=${taskId}`);
+        } else {
+          const index = globalConnections.indexOf(connection);
+          if (index !== -1) {
+            globalConnections.splice(index, 1);
+            logInfo('SSE global connection closed');
+          }
         }
-      );
+      });
+    } catch (error) {
+      logError('Failed to create SSE session:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: 'Failed to create SSE connection',
+          details: error instanceof Error ? error.message : String(error)
+        });
+      }
     }
   };
 
-  const handleSSE = (
-    path: string,
-    apiPrefix: string,
-    corsHeaders: Record<string, string>
-  ): Response => {
-    const taskIdMatch = path.match(new RegExp(`^${apiPrefix}/sse(?:/([^/]+))?$`));
-    const taskId = taskIdMatch?.[1];
-    
-    const stream = createSSEStream(taskId, sseConnections, globalConnections);
+  // GET /api/sse (global)
+  app.get(`/${basePath}/sse`, handleSSE);
+  
+  // GET /api/sse/:taskId (specific task)
+  app.get(`/${basePath}/sse/:taskId`, handleSSE);
 
-    return new Response(stream, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
-  };
-
-  const handleGetModels = async (
-    corsHeaders: Record<string, string>
-  ): Promise<Response> => {
+  // GET /api/models
+  app.get(`/${basePath}/models`, async (req: ExpressRequest, res: ExpressResponse) => {
     try {
       const models = await agenticOS.getTaskModels();
-      return new Response(
-        JSON.stringify({ models }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return res.json({ models });
     } catch (error) {
       logError('Failed to get models:', error);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to retrieve models',
-          models: []
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return res.status(500).json({ 
+        error: 'Failed to retrieve models',
+        models: []
+      });
     }
-  };
+  });
 
-  const handleApiRequest = async (
-    request: Request, 
-    path: string, 
-    apiPrefix: string,
-    corsHeaders: Record<string, string>
-  ): Promise<Response> => {
-    try {
-      if (path === `${apiPrefix}/send` && request.method === 'POST') {
-        return handleSendMessage(request, corsHeaders);
-      }
+  // 404 handler
+  app.use((req: ExpressRequest, res: ExpressResponse) => {
+    res.status(404).json({ error: 'Not found' });
+  });
 
-      if (path.startsWith(`${apiPrefix}/sse`) && request.method === 'GET') {
-        return handleSSE(path, apiPrefix, corsHeaders);
-      }
-
-      if (path === `${apiPrefix}/models` && request.method === 'GET') {
-        return handleGetModels(corsHeaders);
-      }
-
-      return new Response(
-        JSON.stringify({ error: 'Not found' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-
-    } catch (error) {
-      logError('API request error:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-      return new Response(
-        JSON.stringify({ error: errorMessage }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-  };
+  let server: ReturnType<typeof app.listen> | null = null;
 
   return {
     start: async () => {
-      logInfo(`Light Service starting on ${host}:${port}`);
-      logInfo(`API available at http://${host}:${port}/${basePath}`);
-      logInfo(`  - POST http://${host}:${port}/${basePath}/send`);
-      logInfo(`  - GET  http://${host}:${port}/${basePath}/sse/:taskId?`);
-      logInfo(`  - GET  http://${host}:${port}/${basePath}/models`);
-      
-      // Always show startup info to console
-      console.log(`🚀 Light Service starting on ${host}:${port}`);
-      console.log(`🔌 API available at http://${host}:${port}/${basePath}`);
-      console.log(`   - POST http://${host}:${port}/${basePath}/send`);
-      console.log(`   - GET  http://${host}:${port}/${basePath}/sse/:taskId?`);
-      console.log(`   - GET  http://${host}:${port}/${basePath}/models`);
+      server = app.listen(port, host, () => {
+        logInfo(`Light Service starting on ${host}:${port}`);
+        logInfo(`API available at http://${host}:${port}/${basePath}`);
+        logInfo(`  - POST http://${host}:${port}/${basePath}/send`);
+        logInfo(`  - GET  http://${host}:${port}/${basePath}/sse/:taskId?`);
+        logInfo(`  - GET  http://${host}:${port}/${basePath}/models`);
+        
+        console.log(`🚀 Light Service starting on ${host}:${port}`);
+        console.log(`🔌 API available at http://${host}:${port}/${basePath}`);
+        console.log(`   - POST http://${host}:${port}/${basePath}/send`);
+        console.log(`   - GET  http://${host}:${port}/${basePath}/sse/:taskId?`);
+        console.log(`   - GET  http://${host}:${port}/${basePath}/models`);
+      });
     },
     stop: () => {
-      // Clean up all connections
-      sseConnections.forEach(conn => {
-        conn.isActive = false;
-      });
       sseConnections.clear();
-      globalConnections.forEach(conn => {
-        conn.isActive = false;
-      });
       globalConnections.length = 0;
       
-      server.stop();
+      if (server) {
+        server.close();
+      }
       logInfo('Light Service stopped');
     },
   };
 };
 
 export { createLightServer };
-
