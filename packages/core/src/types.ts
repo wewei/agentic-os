@@ -110,6 +110,8 @@ export type SystemBus = {
   ) => void;
   unregister: (abilityId: string) => void;
   has: (abilityId: string) => boolean;
+  logError: (taskId: string, message: string) => void;
+  logInfo: (taskId: string, message: string) => void;
 };
 
 // ============================================================================

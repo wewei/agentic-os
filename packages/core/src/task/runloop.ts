@@ -246,9 +246,12 @@ const processLLMResponse = async (
 };
 
 const completeTask = async (callId: string, taskId: string, taskState: TaskState, bus: SystemBus): Promise<void> => {
+  const duration = Date.now() - taskState.task.createdAt;
   taskState.task.completionStatus = 'success';
   taskState.task.updatedAt = Date.now();
   unwrapInvokeResult(await bus.invoke('ldg:task:save', callId, 'system', JSON.stringify({ task: taskState.task })));
+  
+  bus.logInfo(taskId, `Task completed successfully [duration=${duration}ms]`);
   console.log(`Task ${taskId} completed successfully`);
 };
 
@@ -260,6 +263,9 @@ const failTask = async (
   bus: SystemBus
 ): Promise<void> => {
   const errorMessage = error instanceof Error ? error.message : String(error);
+  const duration = Date.now() - taskState.task.createdAt;
+  
+  bus.logError(taskId, `Task failed [duration=${duration}ms, error=${errorMessage}]`);
   console.error(`Task ${taskId} execution error:`, errorMessage);
 
   taskState.task.completionStatus = `failed: ${errorMessage}`;
@@ -316,6 +322,10 @@ export const createExecuteTask = (registry: TaskRegistry, bus: SystemBus) => {
 
     taskState.isRunning = true;
     const callId = generateCallId();
+
+    // Log task start
+    const llmInfo = `${taskState.currentLLMConfig.provider}/${taskState.currentLLMConfig.model}`;
+    bus.logInfo(taskId, `Task started [llm=${llmInfo}]`);
 
     try {
       const messages = taskState.messages;

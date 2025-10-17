@@ -270,6 +270,14 @@ const createLightServer = (agenticConfig: AgenticConfig = {}): LightServer => {
     shell: {
       onMessage: createMessageHandler(sseConnections, globalConnections),
     },
+    bus: {
+      logError: (taskId, message) => {
+        logError(`[${taskId}] ${message}`);
+      },
+      logInfo: (taskId, message) => {
+        logInfo(`[${taskId}] ${message}`);
+      },
+    },
   })
     .with(ledger())
     .with(modelManager(agenticConfig.model ?? { providers: {} }))

@@ -199,6 +199,14 @@ const main = async () => {
     shell: {
       onMessage: sendToConnections,
     },
+    bus: {
+      logError: (taskId, message) => {
+        console.error(`[Bus Error] [${taskId}] ${message}`);
+      },
+      logInfo: (taskId, message) => {
+        console.info(`[Bus Info] [${taskId}] ${message}`);
+      },
+    },
   })
     .with(modelManager(modelConfig))
     .with(taskManager())

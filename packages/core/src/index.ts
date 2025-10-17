@@ -1,6 +1,7 @@
 // Agentic OS - Main Entry Point
 
 import { createSystemBus } from './bus';
+import type { BusLogCallbacks } from './bus';
 import { shell } from './shell';
 
 import type { ShellConfig, PostRequest, PostResponse } from './shell/types';
@@ -9,6 +10,10 @@ import type { Module, SystemBus } from './types';
 
 export type AgenticOSConfig = {
   shell: ShellConfig;
+  bus?: {
+    logError?: (taskId: string, message: string) => void;
+    logInfo?: (taskId: string, message: string) => void;
+  };
 };
 
 export type AgenticOS = {
@@ -30,8 +35,13 @@ const unwrapInvokeResult = <T>(
 export const createAgenticOS = (config: AgenticOSConfig): AgenticOS => {
   console.log('Creating Agentic OS...');
 
-  // Create System Bus with bus controller
-  const bus: SystemBus = createSystemBus();
+  // Create System Bus with bus controller and optional log callbacks
+  const busLogCallbacks: BusLogCallbacks | undefined = config.bus ? {
+    logError: config.bus.logError || ((taskId, msg) => console.error('[Bus Error]', `[${taskId}]`, msg)),
+    logInfo: config.bus.logInfo || ((taskId, msg) => console.info('[Bus Info]', `[${taskId}]`, msg)),
+  } : undefined;
+  
+  const bus: SystemBus = createSystemBus(busLogCallbacks);
 
   // Create shell module with config
   const shellModule = shell(config.shell);
@@ -70,6 +80,7 @@ export const createAgenticOS = (config: AgenticOSConfig): AgenticOS => {
 
 // Export types
 export type { SystemBus, Module, InvokeResult } from './types';
+export type { BusLogCallbacks } from './bus';
 export type { Ledger, LedgerConfig } from './ledger';
 export type { ModelManagerConfig } from './model';
 export type { Task, Call, Message, MessageRole, CallStatus } from './types';

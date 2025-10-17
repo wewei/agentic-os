@@ -95,6 +95,16 @@ type AgentBus = {
   
   // Check if ability exists
   has: (abilityId: string) => boolean;
+  
+  // Log error message
+  // taskId: Task ID
+  // message: Log message
+  logError: (taskId: string, message: string) => void;
+  
+  // Log info message
+  // taskId: Task ID
+  // message: Log message
+  logInfo: (taskId: string, message: string) => void;
 };
 ```
 
@@ -193,6 +203,80 @@ bus.unregister('task:spawn');
 - Hot reload of modules
 - Temporary ability override
 - Cleanup on module shutdown
+
+### Logging API
+
+#### logError() and logInfo()
+
+Modules can log errors and informational messages through the bus:
+
+```typescript
+// Using logging in ability handlers
+bus.register(
+  {
+    id: 'task:spawn',
+    moduleName: 'task',
+    abilityName: 'spawn',
+    description: 'Create a new task',
+    isStream: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'Task goal' }
+      },
+      required: ['goal']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'string' },
+        status: { type: 'string' }
+      }
+    }
+  },
+  async (input: string) => {
+    try {
+      bus.logInfo('system', 'Creating new task');
+      const { goal, parentTaskId } = JSON.parse(input);
+      const task = createTask(goal, parentTaskId);
+      bus.logInfo(task.id, `Task created successfully: ${goal}`);
+      return JSON.stringify({ taskId: task.id, status: task.status });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      bus.logError('system', `Failed to create task: ${errorMsg}`);
+      throw error;
+    }
+  }
+);
+```
+
+**Configure Logging Callbacks**:
+
+When creating an AgenticOS instance, you can provide custom logging callbacks via the `bus` configuration:
+
+```typescript
+import { createAgenticOS } from '@agentic-os/core';
+
+const agenticOS = createAgenticOS({
+  shell: {
+    onMessage: (event) => console.log(event),
+  },
+  bus: {
+    logError: (taskId, message) => {
+      // Custom error logging, e.g., send to logging service
+      console.error(`[Bus Error] [${taskId}] ${message}`);
+    },
+    logInfo: (taskId, message) => {
+      // Custom info logging
+      console.info(`[Bus Info] [${taskId}] ${message}`);
+    },
+  },
+});
+```
+
+**Default Behavior**:
+
+If no custom logging callbacks are provided, the bus will use the default console.error and console.info.
 
 ## Ability ID Naming Convention
 

@@ -79,6 +79,14 @@ export const createAgenticOSInstance = (configPath?: string): AgenticOS => {
     shell: {
       onMessage,
     },
+    bus: {
+      logError: (taskId, message) => {
+        outputError(`[${taskId}] ${message}`);
+      },
+      logInfo: (taskId, message) => {
+        outputError(`[${taskId}] ${message}`);
+      },
+    },
   })
     .with(modelManager(config.model))
     .with(taskManager())

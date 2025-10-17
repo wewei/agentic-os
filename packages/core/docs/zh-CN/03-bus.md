@@ -112,6 +112,16 @@ type AgentBus = {
   
   // 检查能力是否存在
   has: (abilityId: string) => boolean;
+  
+  // 记录错误日志
+  // taskId: 任务 ID
+  // message: 日志内容
+  logError: (taskId: string, message: string) => void;
+  
+  // 记录信息日志
+  // taskId: 任务 ID
+  // message: 日志内容
+  logInfo: (taskId: string, message: string) => void;
 };
 ```
 
@@ -330,6 +340,73 @@ bus.unregister('task:spawn');
 - 模块热重载
 - 临时能力覆盖
 - 模块关闭时清理
+
+### 日志 API
+
+#### logError() 和 logInfo()
+
+模块可以通过总线记录错误和信息日志：
+
+```typescript
+// 在能力 handler 中使用日志
+bus.register(
+  {
+    id: 'task:spawn',
+    moduleName: 'task',
+    abilityName: 'spawn',
+    description: 'Create a new task',
+    inputSchema,
+    outputSchema
+  },
+  async (callId: string, taskId: string, input: string): Promise<AbilityResult<string, string>> => {
+    try {
+      bus.logInfo(taskId, 'Creating new task');
+      const { goal, parentTaskId } = JSON.parse(input);
+      const task = createTask(goal, parentTaskId);
+      bus.logInfo(task.id, `Task created successfully: ${goal}`);
+      return { 
+        type: 'success', 
+        result: JSON.stringify({ taskId: task.id, status: task.status }) 
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      bus.logError(taskId, `Failed to create task: ${errorMsg}`);
+      return { 
+        type: 'error', 
+        error: errorMsg
+      };
+    }
+  }
+);
+```
+
+**配置日志回调**：
+
+在创建 AgenticOS 实例时，可以通过 `bus` 配置传入自定义日志回调：
+
+```typescript
+import { createAgenticOS } from '@agentic-os/core';
+
+const agenticOS = createAgenticOS({
+  shell: {
+    onMessage: (event) => console.log(event),
+  },
+  bus: {
+    logError: (taskId, message) => {
+      // 自定义错误日志处理，例如发送到日志服务
+      console.error(`[Bus Error] [${taskId}] ${message}`);
+    },
+    logInfo: (taskId, message) => {
+      // 自定义信息日志处理
+      console.info(`[Bus Info] [${taskId}] ${message}`);
+    },
+  },
+});
+```
+
+**默认行为**：
+
+如果不提供自定义日志回调，总线将使用默认的 console.error 和 console.info。
 
 ## 能力 ID 命名约定
 

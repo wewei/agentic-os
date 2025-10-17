@@ -41,6 +41,7 @@ const logInvokeResult = (
 
 const executeInvoke = async (
   state: BusState,
+  bus: SystemBus,
   abilityId: string,
   callId: string,
   callerId: string,
@@ -54,19 +55,51 @@ const executeInvoke = async (
       `Ability not found: ${abilityId}`);
   }
 
+  // Log ability invocation start
+  bus.logInfo(callerId, `Ability invoked: ${abilityId} [callId=${callId}]`);
+
   // Validation happens inside the handler (createInternalHandler)
   // which can return invalid-input, success, or error
   try {
     const handlerResult = await ability.handler(callId, callerId, input);
+    
+    // Log ability result
+    if (handlerResult.type === 'success') {
+      const duration = Date.now() - startTime;
+      bus.logInfo(callerId, `Ability completed: ${abilityId} [callId=${callId}, duration=${duration}ms]`);
+    } else {
+      const duration = Date.now() - startTime;
+      const errorMsg = handlerResult.type === 'error' ? handlerResult.error : handlerResult.message;
+      bus.logError(callerId, `Ability failed: ${abilityId} [callId=${callId}, duration=${duration}ms, error=${errorMsg}]`);
+    }
+    
     return logInvokeResult(state, logEntry, startTime, handlerResult);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const duration = Date.now() - startTime;
+    bus.logError(callerId, `Ability exception: ${abilityId} [callId=${callId}, duration=${duration}ms, error=${errorMessage}]`);
     return logInvokeFailure(state, logEntry, startTime, 'unknown-failure', 
       `Handler rejected unexpectedly: ${errorMessage}`);
   }
 };
 
-export const createSystemBus = (): SystemBus => {
+export type BusLogCallbacks = {
+  logError: (taskId: string, message: string) => void;
+  logInfo: (taskId: string, message: string) => void;
+};
+
+const defaultLogCallbacks: BusLogCallbacks = {
+  logError: (taskId: string, message: string) => {
+    console.error('[Bus Error]', `[${taskId}]`, message);
+  },
+  logInfo: (taskId: string, message: string) => {
+    console.info('[Bus Info]', `[${taskId}]`, message);
+  },
+};
+
+export const createSystemBus = (logCallbacks?: BusLogCallbacks): SystemBus => {
+  const callbacks = logCallbacks || defaultLogCallbacks;
+  
   const state: BusState = {
     abilities: new Map(),
     callLog: [],
@@ -81,7 +114,7 @@ export const createSystemBus = (): SystemBus => {
         timestamp: startTime,
       };
       
-      return executeInvoke(state, abilityId, callId, callerId, input, startTime, logEntry);
+      return executeInvoke(state, bus, abilityId, callId, callerId, input, startTime, logEntry);
     },
 
     register: (abilityId, meta, handler) => {
@@ -94,6 +127,14 @@ export const createSystemBus = (): SystemBus => {
 
     has: (abilityId: string): boolean => {
       return hasAbility(state, abilityId);
+    },
+
+    logError: (taskId: string, message: string): void => {
+      callbacks.logError(taskId, message);
+    },
+
+    logInfo: (taskId: string, message: string): void => {
+      callbacks.logInfo(taskId, message);
     },
   };
 
